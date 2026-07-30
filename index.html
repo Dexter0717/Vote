@@ -375,7 +375,7 @@ window.uploadImage=function(qi,oi,input){
   syncCSFromDOM();
   const file=input.files[0];
   if(!file)return;
-  if(file.size>500*1024){toast('图片大小不能超过500KB');return;}
+  if(file.size>5*1024*1024){toast('图片大小不能超过5MB');return;}
   const reader=new FileReader();
   reader.onload=function(e){
     CS.questions[qi].options[oi].image=e.target.result;
@@ -389,7 +389,7 @@ window.uploadTitleImages=function(input){
   const files=input.files;
   if(!files.length)return;
   Array.from(files).forEach(file=>{
-    if(file.size>500*1024){toast('图片大小不能超过500KB');return;}
+    if(file.size>5*1024*1024){toast('图片大小不能超过5MB');return;}
     const reader=new FileReader();
     reader.onload=function(e){
       CS.titleImages.push(e.target.result);
@@ -1107,7 +1107,7 @@ window.removeEditOpt=function(qi,oi){syncESFromDOM();ES.questions[qi].options.sp
 window.uploadEditImage=function(qi,oi,input){
   const file=input.files[0];
   if(!file)return;
-  if(file.size>500*1024){toast('图片大小不能超过500KB');return;}
+  if(file.size>5*1024*1024){toast('图片大小不能超过5MB');return;}
   const reader=new FileReader();
   reader.onload=function(e){
     ES.questions[qi].options[oi].image=e.target.result;
