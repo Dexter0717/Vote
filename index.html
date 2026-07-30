@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>投票</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:#f0f2f5;color:#1a1a2e;line-height:1.6;min-height:100vh}
+    button{font-family:inherit;cursor:pointer;border:none;outline:none}
+    input,textarea{font-family:inherit;outline:none}
+
+    .header{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:20px 16px;text-align:center;position:sticky;top:0;z-index:100}
+    .header h1{font-size:20px;font-weight:700}
+    .container{max-width:600px;margin:0 auto;padding:16px}
+
+    .btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 24px;border-radius:12px;font-size:16px;font-weight:600;transition:all .2s;gap:8px;width:100%}
+    .btn:active{transform:scale(.97)}
+    .btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+    .btn-success{background:linear-gradient(135deg,#11998e,#38ef7d);color:#fff}
+    .btn-danger{background:linear-gradient(135deg,#eb3349,#f45c43);color:#fff}
+    .btn-outline{background:transparent;border:2px solid #667eea;color:#667eea}
+    .btn-sm{padding:8px 16px;font-size:14px;border-radius:8px;width:auto}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+
+    .card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:16px;animation:slideUp .3s ease}
+    @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes popIn{0%{transform:scale(.5);opacity:0}70%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+
+    .hero{text-align:center;padding:30px 0 20px}
+    .hero-icon{font-size:48px;margin-bottom:12px}
+    .hero h2{font-size:22px;color:#1a1a2e;margin-bottom:6px}
+    .hero p{color:#666;font-size:14px}
+    .poll-list-item{display:flex;align-items:center;justify-content:space-between;padding:16px;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);margin-bottom:10px;cursor:pointer;transition:all .2s}
+    .poll-list-item:hover{box-shadow:0 4px 16px rgba(0,0,0,.1);transform:translateY(-1px)}
+    .poll-list-item .info h3{font-size:16px;color:#1a1a2e;margin-bottom:2px}
+    .poll-list-item .info p{font-size:12px;color:#999}
+    .badge{font-size:12px;padding:4px 10px;border-radius:20px;font-weight:600}
+    .badge-active{background:#e8f5e9;color:#2e7d32}
+    .badge-closed{background:#fce4ec;color:#c62828}
+
+    .form-group{margin-bottom:16px}
+    .form-group label{display:block;font-size:14px;font-weight:600;color:#444;margin-bottom:6px}
+    .form-group input,.form-group textarea{width:100%;padding:12px 14px;border:2px solid #e8e8e8;border-radius:10px;font-size:15px;transition:border-color .2s;background:#fafafa}
+    .form-group input:focus,.form-group textarea:focus{border-color:#667eea;background:#fff}
+    .form-group textarea{resize:vertical;min-height:60px}
+    .form-group .hint{font-size:12px;color:#999;margin-top:4px}
+    .form-row{display:flex;gap:10px}
+    .form-row .form-group{flex:1}
+
+    .question-card{background:#f8f9ff;border:2px solid #e8ecf8;border-radius:14px;padding:16px;margin-bottom:12px}
+    .question-card .q-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .question-card .q-num{font-size:13px;font-weight:700;color:#667eea;background:#eef0ff;padding:2px 10px;border-radius:20px}
+    .question-card .q-remove{width:30px;height:30px;border-radius:50%;background:#fee;color:#e53935;font-size:16px;display:flex;align-items:center;justify-content:center}
+    .question-card .q-title-input{width:100%;padding:10px 12px;border:2px solid #e0e4f0;border-radius:8px;font-size:15px;font-weight:600;background:#fff;margin-bottom:10px}
+
+    .option-row{display:flex;gap:8px;margin-bottom:8px;align-items:flex-start}
+    .option-row .option-inputs{flex:1;display:flex;flex-direction:column;gap:6px}
+    .option-row input[type="text"]{width:100%;padding:10px 12px;border:2px solid #e0e4f0;border-radius:8px;font-size:14px;background:#fff}
+    .option-row input[type="text"]:focus{border-color:#667eea}
+    .option-row .remove-btn{width:32px;height:32px;border-radius:50%;background:#fee;color:#e53935;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:0}
+    .add-option-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;border:2px dashed #ccc;border-radius:10px;background:transparent;color:#888;font-size:14px;transition:all .2s;margin-top:4px}
+    .add-option-btn:hover{border-color:#667eea;color:#667eea}
+
+    .option-preview{width:60px;height:60px;border-radius:8px;border:2px solid #e8e8e8;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5}
+    .option-preview img{width:100%;height:100%;object-fit:cover}
+    .option-preview .no-img{font-size:20px;color:#ccc}
+
+    .image-input-group{display:flex;gap:6px;align-items:center}
+    .image-input-group input{flex:1}
+    .image-input-group .upload-btn{padding:8px 12px;border:2px solid #e0e4f0;border-radius:8px;background:#fff;color:#666;font-size:12px;cursor:pointer;white-space:nowrap}
+    .image-input-group .upload-btn:hover{border-color:#667eea;color:#667eea}
+
+    .q-settings{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid #e8ecf8}
+    .q-settings label{font-size:13px;color:#555;display:flex;align-items:center;gap:4px;cursor:pointer}
+    .q-settings input[type="checkbox"]{width:16px;height:16px;accent-color:#667eea}
+    .q-settings input[type="number"]{width:56px;padding:4px 6px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;text-align:center}
+
+    .setting-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0f0f0}
+    .setting-label{font-size:14px;color:#333}
+    .setting-label small{display:block;color:#999;font-size:12px;margin-top:1px}
+    .toggle{position:relative;width:48px;height:28px;flex-shrink:0}
+    .toggle input{opacity:0;width:0;height:0}
+    .toggle .slider{position:absolute;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:14px;transition:.3s;cursor:pointer}
+    .toggle .slider:before{content:'';position:absolute;height:22px;width:22px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+    .toggle input:checked+.slider{background:linear-gradient(135deg,#667eea,#764ba2)}
+    .toggle input:checked+.slider:before{transform:translateX(20px)}
+
+    .poll-header{text-align:center;padding:10px 0 16px}
+    .poll-header h2{font-size:20px;color:#1a1a2e;margin-bottom:4px}
+    .poll-header p{font-size:14px;color:#666}
+    .poll-meta{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0}
+    .meta-tag{font-size:12px;padding:4px 10px;border-radius:20px;background:#f0f0f5;color:#666}
+
+    .vote-question{background:#fff;border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+    .vote-question h3{font-size:16px;color:#1a1a2e;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+    .vote-question .q-badge{font-size:11px;padding:2px 8px;border-radius:10px;background:#eef0ff;color:#667eea;font-weight:700}
+    .vote-question .q-meta{font-size:12px;color:#999;margin-bottom:10px}
+
+    .vote-code-input{width:100%;padding:14px;border:2px solid #764ba2;border-radius:12px;font-size:20px;font-weight:700;text-align:center;letter-spacing:4px;text-transform:uppercase;background:#fafafa}
+
+    .option-card{display:flex;align-items:center;gap:12px;padding:14px;border:2px solid #e8e8e8;border-radius:12px;margin-bottom:8px;cursor:pointer;transition:all .2s;background:#fff}
+    .option-card:hover{border-color:#667eea;background:#f8f9ff}
+    .option-card.selected{border-color:#667eea;background:#f0f3ff}
+    .option-card .check-box{width:24px;height:24px;border-radius:50%;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;font-size:14px;color:transparent}
+    .option-card.selected .check-box{border-color:#667eea;background:#667eea;color:#fff}
+    .option-card.multi .check-box{border-radius:4px}
+    .option-card .option-content{flex:1;display:flex;align-items:center;gap:12px}
+    .option-card .option-img{width:60px;height:60px;border-radius:8px;object-fit:cover;border:1px solid #eee}
+    .option-card .option-text{font-size:15px;flex:1}
+    .option-card.select-all-card{border-style:dashed;border-color:#667eea;background:#f8f9ff}
+    .option-card.select-all-card .option-text{color:#667eea;font-weight:600}
+
+    .result-item{margin-bottom:14px}
+    .result-header{display:flex;justify-content:space-between;margin-bottom:6px;align-items:center}
+    .result-header .text{font-size:15px;font-weight:500;display:flex;align-items:center;gap:8px}
+    .result-header .result-img{width:40px;height:40px;border-radius:6px;object-fit:cover}
+    .result-header .count{font-size:14px;color:#666}
+    .result-bar{height:32px;background:#f0f0f5;border-radius:8px;overflow:hidden;position:relative}
+    .result-fill{height:100%;border-radius:8px;transition:width 1s ease;display:flex;align-items:center;padding:0 12px;min-width:fit-content}
+    .result-fill .percentage{font-size:13px;font-weight:700;color:#fff;white-space:nowrap}
+    .result-item:nth-child(1) .result-fill{background:linear-gradient(135deg,#667eea,#764ba2)}
+    .result-item:nth-child(2) .result-fill{background:linear-gradient(135deg,#11998e,#38ef7d)}
+    .result-item:nth-child(3) .result-fill{background:linear-gradient(135deg,#f093fb,#f5576c)}
+    .result-item:nth-child(4) .result-fill{background:linear-gradient(135deg,#4facfe,#00f2fe)}
+    .result-item:nth-child(5) .result-fill{background:linear-gradient(135deg,#43e97b,#38f9d7)}
+    .result-item:nth-child(6) .result-fill{background:linear-gradient(135deg,#fa709a,#fee140)}
+    .my-vote-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:#e8f5e9;color:#2e7d32;margin-left:8px;font-weight:600}
+    .total-votes{text-align:center;padding:16px;font-size:14px;color:#666;border-top:1px solid #f0f0f0;margin-top:8px}
+    .result-question{background:#fff;border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+    .result-question h3{font-size:16px;color:#1a1a2e;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .result-question .q-total{font-size:12px;color:#999;font-weight:400}
+
+    .share-section{text-align:center;padding:20px 0}
+    .share-icon{font-size:40px;margin-bottom:12px}
+    .share-url{background:#f5f5f5;padding:12px;border-radius:10px;font-size:13px;color:#666;word-break:break-all;margin:12px 0;border:1px solid #e8e8e8}
+    .share-id{font-size:28px;font-weight:700;color:#667eea;letter-spacing:4px;margin:12px 0}
+    .vote-code-display{font-size:32px;font-weight:800;color:#764ba2;letter-spacing:6px;margin:12px 0;padding:12px;background:#f8f0ff;border-radius:12px;display:inline-block}
+    .copy-btn{padding:8px 20px;border-radius:8px;background:#667eea;color:#fff;font-size:14px;font-weight:600;cursor:pointer;border:none}
+    .copy-btn.copied{background:#38ef7d}
+
+    .admin-section{background:#fff;border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+    .admin-section h3{font-size:16px;color:#1a1a2e;margin-bottom:12px}
+    .voter-row{display:flex;align-items:flex-start;padding:10px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;flex-wrap:wrap}
+    .voter-row:last-child{border-bottom:none}
+    .voter-code{font-weight:700;color:#667eea;min-width:60px}
+    .voter-time{color:#999;min-width:100px}
+    .voter-selections{flex:1;color:#333;margin-top:4px}
+    .voter-selections .sel-tag{display:inline-block;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:6px;margin:2px 4px 2px 0;font-size:12px}
+
+    .export-section{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+    .export-section .btn{flex:1;min-width:120px}
+
+    .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:10px 24px;border-radius:24px;font-size:14px;z-index:999;animation:toastIn .3s ease}
+    @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    .empty-state{text-align:center;padding:40px 20px;color:#999}
+    .empty-state .icon{font-size:48px;margin-bottom:12px}
+    .success-icon{font-size:64px;animation:popIn .5s ease;margin-bottom:12px}
+
+    @media(max-width:480px){.container{padding:12px}.card{padding:16px}}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🗳️ 投票</h1>
+  </div>
+  <div class="container" id="app"></div>
+
+<script>
+(function(){
+'use strict';
+
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const esc = s => { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; };
+
+function genId(len=8){return Math.random().toString(36).substr(2,len).toUpperCase();}
+function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2500);}
+function timeAgo(ts){const d=Date.now()-ts;if(d<6e4)return'刚刚';if(d<36e5)return Math.floor(d/6e4)+'分钟前';if(d<864e5)return Math.floor(d/36e5)+'小时前';return Math.floor(d/864e5)+'天前';}
+function dateStr(ts){if(!ts)return'';const d=new Date(ts);return d.toLocaleDateString('zh-CN',{month:'numeric',day:'numeric'})+' '+d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});}
+
+const STORAGE_KEY = 'vote_app_data';
+function loadData(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{};}catch{return {};}}
+function saveData(data){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}
+
+let currentVoteCode = localStorage.getItem('vote_current_code') || '';
+
+// ========== 路由 ==========
+let view='home', pollId=null;
+function nav(v,id){view=v;if(id)pollId=id;render();}
+function handleHash(){
+  const h=location.hash.slice(1);
+  if(h.startsWith('vote/'))nav('vote',h.slice(5));
+  else if(h.startsWith('results/'))nav('results',h.slice(8));
+  else if(h.startsWith('admin/'))nav('admin',h.slice(6));
+  else if(h.startsWith('edit/'))nav('edit',h.slice(5));
+  else if(h==='create')nav('create');
+  else nav('home');
+}
+window.addEventListener('hashchange',handleHash);
+function render(){
+  const app=$('#app');
+  ({home:renderHome,create:renderCreate,vote:renderVote,results:renderResults,share:renderShare,admin:renderAdmin,edit:renderEdit}[view])(app);
+}
+
+// ========== HOME ==========
+function renderHome(app){
+  const data=loadData();
+  const polls=Object.values(data).sort((a,b)=>b.createdAt-a.createdAt);
+
+  // 检查是否是发起者模式
+  const isCreatorMode=localStorage.getItem('creator_mode')==='true';
+
+  app.innerHTML=`
+    <div class="hero">
+      <div class="hero-icon">🗳️</div>
+      <h2>发起一个投票</h2>
+      <p>支持多题、图片选项、全选、日期限制</p>
+    </div>
+    ${isCreatorMode?`
+      <button class="btn btn-primary" onclick="location.hash='create'" style="margin-bottom:10px">➕ 创建投票</button>
+      <button class="btn btn-danger" onclick="exitCreatorMode()" style="margin-bottom:20px">🔒 退出发起者模式</button>
+    `:`
+      <button class="btn btn-primary" onclick="location.hash='create'" style="margin-bottom:10px">➕ 创建投票</button>
+      <button class="btn btn-outline" onclick="enterCreatorMode()" style="margin-bottom:20px">🔑 发起者模式</button>
+    `}
+    <div id="pl"></div>`;
+  const el=$('#pl');
+  if(!polls.length){el.innerHTML='<div class="empty-state"><div class="icon">📋</div><p>还没有投票</p></div>';return;}
+  el.innerHTML=polls.map(p=>{
+    const now=Date.now();
+    let statusText='',badgeClass='badge-active';
+    if(p.closed){statusText='已结束';badgeClass='badge-closed';}
+    else if(p.endAt&&now>p.endAt){statusText='已过期';badgeClass='badge-closed';}
+    else if(p.startAt&&now<p.startAt){statusText='未开始';badgeClass='badge-closed';}
+    else{statusText=p.endAt?'截止 '+dateStr(p.endAt):'进行中';}
+
+    const isCreator=isPollCreator(p.id);
+    const isCreatorMode=localStorage.getItem('creator_mode')==='true';
+    const showEdit=isCreator&&isCreatorMode;
+
+    return `<div class="poll-list-item" onclick="location.hash='vote/${p.id}'">
+      <div class="info"><h3>${esc(p.title)}${showEdit?' 🔑':''}</h3><p>${p.questions.length}题 · ${Object.keys(p.voters||{}).length}人已投 · ${timeAgo(p.createdAt)}</p></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        ${showEdit?`<button onclick="event.stopPropagation();location.hash='admin/${p.id}'" style="background:#667eea;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer">管理</button>`:''}
+        <span class="badge ${badgeClass}">${statusText}</span>
+      </div></div>`;
+  }).join('');
+}
+
+// ========== CREATE ==========
+let CS={title:'',titleImages:[],description:'',questions:[{title:'',options:[{text:'',image:''}],multipleChoice:false,maxVotes:0,allSelectOption:false}],startAt:'',endAt:'',showResultsBeforeEnd:true};
+
+function renderCreate(app){
+  const now=new Date().toISOString().slice(0,16);
+  const titleImagesHtml=CS.titleImages.map((img,i)=>`
+    <div style="position:relative;display:inline-block;margin:4px">
+      <img src="${esc(img)}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid #e8e8e8">
+      <button onclick="removeTitleImage(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e53935;color:#fff;font-size:12px;border:none;cursor:pointer">×</button>
+    </div>`).join('');
+
+  app.innerHTML=`
+    <div class="card">
+      <h2 style="font-size:18px;margin-bottom:16px">📝 创建投票</h2>
+      <div class="form-group"><label>投票标题 *</label><input id="c-title" type="text" placeholder="例如：2025年度评选" maxlength="80" value="${esc(CS.title)}" oninput="CS.title=this.value"></div>
+      <div class="form-group"><label>标题图片（可选，支持多张）</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">${titleImagesHtml||'<span style="color:#999;font-size:13px">暂无图片</span>'}</div>
+        <label class="upload-btn" style="display:inline-flex">📷 添加图片<input type="file" accept="image/*" multiple style="display:none" onchange="uploadTitleImages(this)"></label>
+      </div>
+      <div class="form-group"><label>描述（可选）</label><textarea id="c-desc" rows="2" placeholder="补充说明..." oninput="CS.description=this.value">${esc(CS.description)}</textarea></div>
+      <div class="form-group"><label>时间范围（可选）</label>
+        <div class="form-row">
+          <div class="form-group"><input type="datetime-local" id="c-start" value="${CS.startAt}" min="${now}" onchange="CS.startAt=this.value"><div class="hint">开始日期</div></div>
+          <div class="form-group"><input type="datetime-local" id="c-end" value="${CS.endAt}" min="${CS.startAt||now}" onchange="CS.endAt=this.value"><div class="hint">截止日期</div></div>
+        </div>
+      </div>
+      <div class="form-group"><label>投票设置</label>
+        <div class="card" style="padding:8px 12px;margin-bottom:0">
+          <div class="setting-item"><div class="setting-label">投票前显示结果<small>投票前是否能看到当前结果</small></div>
+            <label class="toggle"><input type="checkbox" id="c-showresult" ${CS.showResultsBeforeEnd?'checked':''}><span class="slider"></span></label></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin:16px 0"><span style="flex:1;height:1px;background:#e8e8e8"></span><span style="font-size:12px;color:#aaa">问题列表</span><span style="flex:1;height:1px;background:#e8e8e8"></span></div>
+      <div id="c-questions"></div>
+      <button class="add-option-btn" onclick="addQuestion()" style="margin-bottom:16px">+ 添加问题</button>
+      <button class="btn btn-primary" onclick="submitCreate()" id="create-btn">🚀 发起投票</button>
+    </div>`;
+  renderQuestions();
+}
+
+function renderQuestions(){
+  const el=$('#c-questions');
+  el.innerHTML=CS.questions.map((q,qi)=>{
+    const ohtml=q.options.map((o,oi)=>`
+      <div class="option-row">
+        <div class="option-preview">${o.image?`<img src="${esc(o.image)}" onerror="this.parentElement.innerHTML='<div class=no-img>🖼️</div>'">`:'<div class="no-img">🖼️</div>'}</div>
+        <div class="option-inputs">
+          <input type="text" placeholder="选项${oi+1}文字" maxlength="60" value="${esc(o.text)}">
+          <div class="image-input-group">
+            <input type="text" placeholder="图片URL（可选）" value="${esc(o.image)}">
+            <label class="upload-btn">📷 上传<input type="file" accept="image/*" style="display:none" onchange="uploadImage(${qi},${oi},this)"></label>
+          </div>
+        </div>
+        ${q.options.length>1?`<button class="remove-btn" onclick="removeOpt(${qi},${oi})">×</button>`:''}
+      </div>`).join('');
+
+    // 全选选项的预览
+    const allSelectPreview=q.allSelectOption?`
+      <div class="option-row" style="background:#f0f3ff;border:2px dashed #667eea;border-radius:8px;padding:10px;margin-top:8px">
+        <div class="option-preview" style="background:#eef0ff"><div style="font-size:24px">☑</div></div>
+        <div class="option-inputs">
+          <input type="text" value="全选（点击选中所有选项）" disabled style="background:#eef0ff;color:#667eea;font-weight:600;border-color:#667eea">
+        </div>
+      </div>`:'';
+
+    return `
+      <div class="question-card" data-qi="${qi}">
+        <div class="q-header">
+          <span class="q-num">问题 ${qi+1}</span>
+          ${CS.questions.length>1?`<button class="q-remove" onclick="removeQuestion(${qi})">×</button>`:''}
+        </div>
+        <input class="q-title-input" type="text" placeholder="输入问题标题" maxlength="80" value="${esc(q.title)}">
+        <div id="q-opts-${qi}">${ohtml}</div>
+        ${allSelectPreview}
+        <button class="add-option-btn" onclick="addOpt(${qi})">+ 添加选项</button>
+        <div class="q-settings">
+          <label><input type="checkbox" class="multi-check" ${q.multipleChoice?'checked':''}> 多选</label>
+          <span class="multi-settings" style="${q.multipleChoice?'':'display:none'}">
+            最多 <input type="number" class="max-votes-input" min="0" max="10" value="${q.maxVotes}"> 项
+          </span>
+          <label class="all-select-settings" style="${q.multipleChoice?'':'display:none'}">
+            <input type="checkbox" class="all-select-check" ${q.allSelectOption?'checked':''}> 启用"全选"功能
+          </label>
+        </div>
+      </div>`;
+  }).join('');
+
+  // 绑定事件（使用事件委托避免re-render丢失）
+  $$('.question-card').forEach((card,qi)=>{
+    const multiCheck=card.querySelector('.multi-check');
+    const allSelectCheck=card.querySelector('.all-select-check');
+    const multiSettings=card.querySelector('.multi-settings');
+    const allSelectSettings=card.querySelector('.all-select-settings');
+
+    if(multiCheck){
+      multiCheck.addEventListener('change',function(){
+        const checked=this.checked;
+        CS.questions[qi].multipleChoice=checked;
+        if(multiSettings)multiSettings.style.display=checked?'':'none';
+        if(allSelectSettings)allSelectSettings.style.display=checked?'':'none';
+        if(!checked){
+          CS.questions[qi].maxVotes=0;
+          CS.questions[qi].allSelectOption=false;
+          if(allSelectCheck)allSelectCheck.checked=false;
+        }
+      });
+    }
+
+    if(allSelectCheck){
+      allSelectCheck.addEventListener('change',function(){
+        CS.questions[qi].allSelectOption=this.checked;
+      });
+    }
+
+    const maxVotesInput=card.querySelector('.max-votes-input');
+    if(maxVotesInput){
+      maxVotesInput.addEventListener('change',function(){
+        CS.questions[qi].maxVotes=parseInt(this.value)||0;
+      });
+    }
+  });
+}
+
+window.uploadImage=function(qi,oi,input){
+  syncCSFromDOM();
+  const file=input.files[0];
+  if(!file)return;
+  if(file.size>500*1024){toast('图片大小不能超过500KB');return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    CS.questions[qi].options[oi].image=e.target.result;
+    renderQuestions();
+  };
+  reader.readAsDataURL(file);
+};
+
+window.uploadTitleImages=function(input){
+  syncCSFromDOM();
+  const files=input.files;
+  if(!files.length)return;
+  Array.from(files).forEach(file=>{
+    if(file.size>500*1024){toast('图片大小不能超过500KB');return;}
+    const reader=new FileReader();
+    reader.onload=function(e){
+      CS.titleImages.push(e.target.result);
+      renderCreate($('#app'));
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+};
+
+window.removeTitleImage=function(i){
+  syncCSFromDOM();
+  CS.titleImages.splice(i,1);
+  renderCreate($('#app'));
+};
+
+// ========== 发起者模式 ==========
+window.enterCreatorMode=function(){
+  const password=prompt('请输入发起者密码：');
+  if(password==='999'){
+    localStorage.setItem('creator_mode','true');
+    toast('已进入发起者模式');
+    renderHome($('#app'));
+  }else if(password!==null){
+    toast('密码错误');
+  }
+};
+
+window.exitCreatorMode=function(){
+  localStorage.removeItem('creator_mode');
+  toast('已退出发起者模式');
+  renderHome($('#app'));
+};
+
+// 检查是否是某个投票的发起者
+function isPollCreator(pollId){
+  return !!localStorage.getItem('ct_'+pollId);
+}
+
+// 同步DOM中的值到CS对象
+function syncCSFromDOM(){
+  // 同步标题和描述
+  const titleEl=$('#c-title');
+  const descEl=$('#c-desc');
+  if(titleEl)CS.title=titleEl.value;
+  if(descEl)CS.description=descEl.value;
+  // 同步每个问题
+  CS.questions.forEach((q,qi)=>{
+    const card=$$('.question-card')[qi];
+    if(!card)return;
+    const titleInput=card.querySelector('.q-title-input');
+    if(titleInput)q.title=titleInput.value;
+    // 同步多选状态 - 使用data属性确保正确
+    const multiCheck=card.querySelector('.multi-check');
+    q.multipleChoice=multiCheck?multiCheck.checked:false;
+    // 同步全选状态
+    const allSelectCheck=card.querySelector('.all-select-check');
+    q.allSelectOption=allSelectCheck?allSelectCheck.checked:false;
+    // 同步最多可选数量
+    const maxVotesInput=card.querySelector('.max-votes-input');
+    q.maxVotes=maxVotesInput?parseInt(maxVotesInput.value)||0:0;
+    // 同步选项
+    const optsContainer=card.querySelector(`[id^="q-opts-"]`);
+    if(optsContainer){
+      const rows=optsContainer.querySelectorAll('.option-row');
+      rows.forEach((row,oi)=>{
+        if(!q.options[oi])return;
+        const textInput=row.querySelector('input[type="text"]:not([placeholder*="图片"])');
+        const imgInput=row.querySelector('input[placeholder*="图片"]');
+        if(textInput)q.options[oi].text=textInput.value;
+        if(imgInput)q.options[oi].image=imgInput.value;
+      });
+    }
+  });
+}
+
+window.addQuestion=function(){
+  syncCSFromDOM();
+  if(CS.questions.length>=10){toast('最多10个问题');return;}
+  CS.questions.push({title:'',options:[{text:'',image:''}],multipleChoice:false,maxVotes:0,allSelectOption:false});
+  renderQuestions();
+  const cards=$$('.question-card');cards[cards.length-1].scrollIntoView({behavior:'smooth',block:'center'});
+};
+window.removeQuestion=function(i){syncCSFromDOM();CS.questions.splice(i,1);renderQuestions();};
+window.addOpt=function(qi){
+  syncCSFromDOM();
+  if(CS.questions[qi].options.length>=10){toast('最多10个选项');return;}
+  CS.questions[qi].options.push({text:'',image:''});
+  renderQuestions();
+};
+window.removeOpt=function(qi,oi){syncCSFromDOM();CS.questions[qi].options.splice(oi,1);renderQuestions();};
+
+window.submitCreate=async function(){
+  syncCSFromDOM();
+  const title=$('#c-title').value.trim();
+  const description=$('#c-desc').value.trim();
+  const startVal=$('#c-start').value;
+  const endVal=$('#c-end').value;
+  if(!title){toast('请输入标题');$('#c-title').focus();return;}
+  for(let i=0;i<CS.questions.length;i++){
+    const q=CS.questions[i];
+    syncCSFromDOM(); // 每次循环都同步一次确保状态正确
+    if(!q.title.trim()){toast(`问题${i+1}需要标题`);return;}
+    // 过滤掉空选项
+    const validOpts=q.options.filter(o=>(o.text&&o.text.trim())||o.image);
+    if(validOpts.length<2){toast(`问题${i+1}"${q.title||'未命名'}"需要至少2个有效选项`);return;}
+  }
+  if(startVal&&endVal&&new Date(startVal)>=new Date(endVal)){toast('开始时间必须早于截止时间');return;}
+  const btn=$('#create-btn');btn.disabled=true;btn.textContent='创建中...';
+  const voteCode=genId(6);
+  const id=genId(10);
+  const creatorToken=genId(32);
+
+  // 构建问题，处理全选选项
+  const questions=CS.questions.map((q,qi)=>{
+    const validOpts=q.options.filter(o=>o.text.trim()||o.image);
+    let options=validOpts.map((o,i)=>({
+      id:i+1,text:o.text.trim(),image:o.image||'',votes:0,isAllSelect:false
+    }));
+
+    // 如果启用了全选功能，添加全选选项（放在最后）
+    if(q.allSelectOption&&q.multipleChoice){
+      options.push({
+        id:options.length+1,text:'全选',image:'',votes:0,isAllSelect:true
+      });
+    }
+
+    return{
+      id:qi+1,title:q.title.trim(),options,
+      multipleChoice:q.multipleChoice,maxVotes:q.maxVotes,hasAllSelect:q.allSelectOption&&q.multipleChoice,
+    };
+  });
+
+  const poll={
+    id,title:title.trim(),titleImages:CS.titleImages,description:description.trim(),
+    questions,
+    settings:{showResultsBeforeEnd:$('#c-showresult').checked},
+    voteCode,voters:{},createdAt:Date.now(),
+    startAt:startVal?new Date(startVal).getTime():null,
+    endAt:endVal?new Date(endVal).getTime():null,
+    closed:false,creatorToken,
+  };
+  const data=loadData();data[id]=poll;saveData(data);
+  localStorage.setItem('ct_'+id,creatorToken);
+  pollId=id;
+  CS={title:'',titleImages:[],description:'',questions:[{title:'',options:[{text:'',image:''}],multipleChoice:false,maxVotes:0,allSelectOption:false}],startAt:'',endAt:'',showResultsBeforeEnd:true};
+  nav('share');
+};
+
+// ========== SHARE ==========
+function renderShare(app){
+  const data=loadData();
+  const poll=data[pollId];
+  if(!poll){nav('home');return;}
+  const url=location.origin+location.pathname+'#vote/'+pollId;
+  app.innerHTML=`
+    <div class="card"><div class="share-section">
+      <div class="share-icon">🎉</div>
+      <h2 style="font-size:18px;margin-bottom:4px">投票创建成功！</h2>
+      <p style="color:#666;font-size:14px;margin-bottom:16px">分享下方链接给投票者</p>
+      <div class="share-url" id="share-url">${url}</div>
+      <button class="copy-btn" onclick="copyUrl()" id="copy-btn">📋 复制链接</button>
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0">
+        <p style="color:#999;font-size:12px;margin-bottom:6px">投票编号</p>
+        <div class="share-id">${pollId}</div>
+      </div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0">
+        <p style="color:#999;font-size:12px;margin-bottom:6px">投票码（投票者需输入此码）</p>
+        <div class="vote-code-display">${poll.voteCode}</div>
+        <button class="copy-btn" onclick="copyCode()" id="copy-code-btn" style="margin-top:8px">📋 复制投票码</button>
+      </div>
+    </div></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-outline" onclick="location.hash='vote/${pollId}'" style="flex:1">👀 预览</button>
+      <button class="btn btn-primary" onclick="location.hash='results/${pollId}'" style="flex:1">📊 结果</button>
+      <button class="btn btn-success" onclick="location.hash='admin/${pollId}'" style="flex:1">🔒 后台</button>
+    </div>
+    <button class="btn btn-outline" onclick="location.hash=''" style="margin-top:10px">返回首页</button>`;
+}
+window.copyUrl=function(){
+  const url=location.origin+location.pathname+'#vote/'+pollId;
+  navigator.clipboard.writeText(url).then(()=>{const b=$('#copy-btn');b.textContent='✅ 已复制';b.classList.add('copied');setTimeout(()=>{b.textContent='📋 复制链接';b.classList.remove('copied');},2000);}).catch(()=>{toast('复制失败');});
+};
+window.copyCode=function(){
+  const data=loadData();const poll=data[pollId];if(!poll)return;
+  navigator.clipboard.writeText(poll.voteCode).then(()=>{const b=$('#copy-code-btn');b.textContent='✅ 已复制';b.classList.add('copied');setTimeout(()=>{b.textContent='📋 复制投票码';b.classList.remove('copied');},2000);}).catch(()=>{toast('复制失败');});
+};
+
+// ========== VOTE ==========
+let selections={};
+async function renderVote(app){
+  app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  const data=loadData();const poll=data[pollId];
+  if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
+  const now=Date.now();
+  if(poll.closed||(poll.endAt&&now>poll.endAt)){
+    // 创建者可以进入后台
+    if(localStorage.getItem('ct_'+pollId)){
+      app.innerHTML=`
+        <div class="card">
+          <div class="empty-state">
+            <div class="icon">⏰</div>
+            <p>投票已结束</p>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="location.hash='admin/${pollId}'" style="margin-bottom:10px">🔒 进入后台</button>
+        <button class="btn btn-outline" onclick="location.hash='results/${pollId}'">📊 查看结果</button>`;
+      return;
+    }
+    nav('results');return;
+  }
+  if(poll.startAt&&now<poll.startAt){
+    const isCreator=isPollCreator(pollId);
+    app.innerHTML=`<div class="card"><div class="empty-state"><div class="icon">⏰</div><p>投票尚未开始</p><p style="font-size:13px;color:#999">开始时间：${dateStr(poll.startAt)}</p></div></div>
+    ${isCreator?`<button class="btn btn-primary" onclick="location.hash='admin/${pollId}'" style="margin-bottom:10px">🔑 进入后台管理</button>
+    <button class="btn btn-outline" onclick="location.hash='edit/${pollId}'" style="margin-bottom:10px">✏️ 编辑投票</button>`:''}
+    <button class="btn btn-outline" onclick="location.hash=''">返回首页</button>`;
+    return;
+  }
+  if(currentVoteCode&&poll.voters[currentVoteCode]){
+    // 已投票，但创建者可以进入后台
+    if(localStorage.getItem('ct_'+pollId)){
+      renderVoteForm(app,poll,true);
+      return;
+    }
+    nav('results');return;
+  }
+  renderVoteForm(app,poll,false);
+}
+function renderVoteForm(app,poll,hasVoted=false){
+  selections={};poll.questions.forEach(q=>selections[q.id]=new Set());
+  const startTxt=poll.startAt?'⏰ 开始 '+dateStr(poll.startAt):'';
+  const endTxt=poll.endAt?'截止 '+dateStr(poll.endAt):'';
+  const timeTxt=[startTxt,endTxt].filter(Boolean).join(' ~ ');
+  const isCreator=!!localStorage.getItem('ct_'+pollId);
+
+  if(hasVoted){
+    // 已投票，显示提示和按钮
+    app.innerHTML=`
+      <div class="card">
+        <div class="poll-header">
+          <div class="success-icon">✅</div>
+          <h2>${esc(poll.title)}</h2>
+          ${poll.description?`<p>${esc(poll.description)}</p>`:''}
+        </div>
+        <div style="text-align:center;padding:20px">
+          <p style="font-size:16px;color:#333;margin-bottom:8px">你已经投过票了</p>
+          <p style="font-size:13px;color:#999">投票码：${esc(currentVoteCode)}</p>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="location.hash='results/${poll.id}'" style="margin-bottom:10px">📊 查看结果</button>
+      ${isCreator?`<button class="btn btn-success" onclick="location.hash='admin/${poll.id}'">🔒 进入后台</button>`:''}
+      <button class="btn btn-outline" onclick="location.hash=''" style="margin-top:10px">返回首页</button>`;
+    return;
+  }
+
+  app.innerHTML=`
+    <div class="card">
+      <div class="poll-header">
+        ${poll.titleImages&&poll.titleImages.length?`<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:12px">${poll.titleImages.map(img=>`<img src="${esc(img)}" style="max-width:200px;max-height:150px;border-radius:8px;object-fit:cover">`).join('')}</div>`:''}
+        <h2>${esc(poll.title)}</h2>
+        ${poll.description?`<p>${esc(poll.description)}</p>`:''}
+        <div class="poll-meta">
+          <span class="meta-tag">${poll.questions.length}个问题</span>
+          ${timeTxt?`<span class="meta-tag">${timeTxt}</span>`:''}
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label>🔑 输入投票码</label>
+        <input type="text" id="vote-code-input" class="vote-code-input" placeholder="请输入6位投票码" maxlength="6" value="${esc(currentVoteCode)}" oninput="currentVoteCode=this.value.toUpperCase();this.value=currentVoteCode;updateVoteBtn()">
+        <div class="hint" style="text-align:center;margin-top:4px">请向投票发起者获取投票码</div>
+      </div>
+      <div id="vote-questions"></div>
+      <div style="margin-top:16px">
+        <div id="vote-hint" style="text-align:center;font-size:13px;margin-bottom:8px;color:#999">请输入投票码并完成选择</div>
+        <button class="btn btn-success" onclick="submitVote()" id="vote-btn" disabled>🗳️ 提交投票</button>
+      </div>
+      ${poll.settings.showResultsBeforeEnd?`<div style="text-align:center;margin-top:12px"><a href="#results/${poll.id}" style="color:#667eea;font-size:14px">查看当前结果 →</a></div>`:''}
+    </div>`;
+  renderVoteQuestions(poll);
+}
+function renderVoteQuestions(poll){
+  const el=$('#vote-questions');
+  el.innerHTML=poll.questions.map((q,qi)=>{
+    const isMulti=q.multipleChoice;
+    const optHtml=q.options.map(o=>{
+      const isAllSelect=o.isAllSelect;
+      const isSelected=selections[q.id].has(o.id);
+      const imgHtml=o.image?`<img class="option-img" src="${esc(o.image)}" onerror="this.style.display='none'">`:'';
+      const label=isAllSelect?`☑ ${esc(o.text||'全选')}`:esc(o.text);
+      return `<div class="option-card ${isSelected?'selected':''} ${isAllSelect?'select-all-card':''} ${isMulti?'multi':''}" onclick="toggleOpt(${q.id},${o.id})">
+        <div class="check-box">✓</div>
+        <div class="option-content">${imgHtml}<div class="option-text">${label}</div></div>
+      </div>`;
+    }).join('');
+    return `<div class="vote-question">
+      <h3><span class="q-badge">Q${qi+1}</span>${esc(q.title)}</h3>
+      <div class="q-meta">${isMulti?(q.maxVotes>0?`可多选（最多${q.maxVotes}项）`:'可多选（点击多个选项）'):'单选（只能选一个）'}${q.hasAllSelect?' · 含全选选项':''}</div>
+      ${optHtml}
+    </div>`;
+  }).join('');
+}
+window.toggleOpt=function(qid,oid){
+  const data=loadData();const poll=data[pollId];if(!poll)return;
+  const q=poll.questions.find(x=>x.id===qid);if(!q)return;
+  const clickedOpt=q.options.find(o=>o.id===oid);
+
+  if(!q.multipleChoice){
+    // 单选模式
+    selections[qid].clear();
+    selections[qid].add(oid);
+  }else{
+    // 多选模式
+    if(selections[qid].has(oid)){
+      selections[qid].delete(oid);
+    }else{
+      if(q.maxVotes>0&&selections[qid].size>=q.maxVotes){
+        toast('最多只能选'+q.maxVotes+'项');
+        return;
+      }
+      selections[qid].add(oid);
+    }
+    // 处理全选选项
+    if(clickedOpt&&clickedOpt.isAllSelect){
+      const nonAllOpts=q.options.filter(o=>!o.isAllSelect);
+      if(selections[qid].has(oid)){
+        nonAllOpts.forEach(o=>selections[qid].add(o.id));
+      }else{
+        nonAllOpts.forEach(o=>selections[qid].delete(o.id));
+      }
+    }else{
+      const allSelectOpt=q.options.find(o=>o.isAllSelect);
+      if(allSelectOpt){
+        const nonAllOpts=q.options.filter(o=>!o.isAllSelect);
+        const allSel=nonAllOpts.every(o=>selections[qid].has(o.id));
+        if(allSel&&!selections[qid].has(allSelectOpt.id)){
+          selections[qid].add(allSelectOpt.id);
+        }else if(!allSel&&selections[qid].has(allSelectOpt.id)){
+          selections[qid].delete(allSelectOpt.id);
+        }
+      }
+    }
+  }
+  renderVoteQuestions(poll);
+  updateVoteBtn();
+};
+function updateVoteBtn(){
+  const data=loadData();const poll=data[pollId];if(!poll)return;
+  // 直接从输入框获取值
+  const codeInput=$('#vote-code-input');
+  const code=codeInput?codeInput.value.trim():currentVoteCode.trim();
+  const codeValid=code.length===6;
+  const allAnswered=poll.questions.every(q=>selections[q.id]&&selections[q.id].size>0);
+  const btn=$('#vote-btn');
+  if(!btn)return;
+  btn.disabled=!(codeValid&&allAnswered);
+  // 显示状态提示
+  const hint=$('#vote-hint');
+  if(hint){
+    if(!codeValid){hint.textContent='请输入6位投票码';hint.style.color='#e53935';}
+    else if(!allAnswered){hint.textContent='请完成所有问题的选择';hint.style.color='#e53935';}
+    else{hint.textContent='✓ 可以提交投票';hint.style.color='#2e7d32';}
+  }
+}
+window.submitVote=async function(){
+  // 直接从输入框获取投票码
+  const codeInput=$('#vote-code-input');
+  const code=codeInput?codeInput.value.trim().toUpperCase():'';
+  if(!code||code.length!==6){toast('请输入6位投票码');if(codeInput)codeInput.focus();return;}
+  // 更新全局变量
+  currentVoteCode=code;
+  const data=loadData();const poll=data[pollId];if(!poll)return;
+  if(poll.voters[code]){toast('该投票码已使用过');return;}
+  const allAnswered=poll.questions.every(q=>selections[q.id]&&selections[q.id].size>0);
+  if(!allAnswered){toast('请完成所有问题');return;}
+  const btn=$('#vote-btn');btn.disabled=true;btn.textContent='提交中...';
+  const finalSelections={};
+  for(const q of poll.questions){
+    const rawSel=Array.from(selections[q.id]);let valid=[];
+    for(const optId of rawSel){const opt=q.options.find(o=>o.id===optId);if(!opt)continue;if(opt.isAllSelect){valid.push(...q.options.filter(o=>!o.isAllSelect).map(o=>o.id));}else{valid.push(optId);}}
+    valid=[...new Set(valid)];
+    if(!q.multipleChoice&&valid.length>1){toast(`"${q.title}"只允许单选`);btn.disabled=false;btn.textContent='🗳️ 提交投票';return;}
+    if(q.maxVotes>0&&valid.length>q.maxVotes){toast(`"${q.title}"最多只能选${q.maxVotes}项`);btn.disabled=false;btn.textContent='🗳️ 提交投票';return;}
+    finalSelections[q.id]=valid;
+  }
+  poll.voters[code]={selections:finalSelections,timestamp:Date.now()};
+  for(const q of poll.questions){for(const optId of (finalSelections[q.id]||[])){const opt=q.options.find(o=>o.id===optId);if(opt)opt.votes++;}}
+  const data2=loadData();data2[pollId]=poll;saveData(data2);
+  toast('投票成功！');nav('results');
+};
+
+// ========== RESULTS ==========
+async function renderResults(app){
+  app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  const data=loadData();const poll=data[pollId];
+  if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
+  const totalVotes=Object.keys(poll.voters).length;
+  const isCreator=!!localStorage.getItem('ct_'+pollId);
+  let mySel={};
+  if(currentVoteCode&&poll.voters[currentVoteCode]){mySel=poll.voters[currentVoteCode].selections||{};}
+  app.innerHTML=`
+    <div class="card">
+      <div class="poll-header">
+        ${poll.titleImages&&poll.titleImages.length?`<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:12px">${poll.titleImages.map(img=>`<img src="${esc(img)}" style="max-width:200px;max-height:150px;border-radius:8px;object-fit:cover">`).join('')}</div>`:''}
+        <div class="success-icon">🎉</div>
+        <h2>${esc(poll.title)}</h2>
+        ${poll.description?`<p>${esc(poll.description)}</p>`:''}
+      </div>
+      <div id="result-items"></div>
+      <div class="total-votes">共 <strong>${totalVotes}</strong> 人参与投票${poll.closed?' · 已结束':''}</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${!poll.closed?`<button class="btn btn-primary" onclick="location.hash='vote/${poll.id}'" style="flex:1">🗳️ 去投票</button>`:''}
+      <button class="btn btn-outline" onclick="location.hash=''" style="flex:1">返回首页</button>
+    </div>
+    ${isCreator?`<button class="btn btn-danger btn-sm" onclick="closePoll('${poll.id}')" style="margin-top:10px;width:100%" ${poll.closed?'disabled':''}>${poll.closed?'已结束':'🔒 结束投票'}</button>`:''}
+    ${isCreator?`<button class="btn btn-primary btn-sm" onclick="location.hash='admin/${poll.id}'" style="margin-top:10px;width:100%">👥 查看投票详情</button>`:''}`;
+  const el=$('#result-items');
+  el.innerHTML=poll.questions.map((q,qi)=>{
+    const qTotal=q.options.reduce((s,o)=>s+o.votes,0);
+    const myOpts=mySel[q.id]||[];
+    const sortedOpts=[...q.options].sort((a,b)=>b.votes-a.votes);
+    return `<div class="result-question">
+      <h3><span class="q-badge">Q${qi+1}</span>${esc(q.title)} <span class="q-total">${qTotal}票</span></h3>
+      ${sortedOpts.map((o,i)=>{
+        const pct=qTotal>0?Math.round((o.votes/qTotal)*1000)/10:0;
+        const imgHtml=o.image?`<img class="result-img" src="${esc(o.image)}" onerror="this.style.display='none'">`:'';
+        return `<div class="result-item" style="animation-delay:${i*.1}s">
+          <div class="result-header"><span class="text">${imgHtml}${esc(o.text)}${myOpts.includes(o.id)?'<span class="my-vote-tag">我的选择</span>':''}</span><span class="count">${o.votes}票</span></div>
+          <div class="result-bar"><div class="result-fill" style="width:0%" data-w="${Math.max(pct,.5)}"><span class="percentage">${pct}%</span></div></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+  setTimeout(()=>{$$('.result-fill').forEach(b=>{b.style.width=b.dataset.w+'%';});},100);
+}
+window.closePoll=async function(id){
+  const t=localStorage.getItem('ct_'+id);if(!t){toast('无权操作');return;}
+  if(!confirm('确定结束投票？'))return;
+  const data=loadData();const poll=data[id];if(!poll)return;
+  poll.closed=true;data[id]=poll;saveData(data);
+  toast('已结束');nav('results');
+};
+
+window.deleteVote=function(code){
+  if(!confirm('确定删除这条投票记录？'))return;
+  const data=loadData();const poll=data[pollId];if(!poll)return;
+  const voter=poll.voters[code];
+  if(!voter){toast('投票记录不存在');return;}
+  // 回退票数
+  for(const q of poll.questions){
+    const selectedIds=voter.selections[q.id]||[];
+    for(const optId of selectedIds){
+      const opt=q.options.find(o=>o.id===optId);
+      if(opt&&opt.votes>0)opt.votes--;
+    }
+  }
+  delete poll.voters[code];
+  data[pollId]=poll;saveData(data);
+  toast('已删除');
+  renderAdmin($('#app'));
+};
+
+// ========== ADMIN ==========
+async function renderAdmin(app){
+  app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  const token=localStorage.getItem('ct_'+pollId);
+  if(!token){app.innerHTML='<div class="card"><div class="empty-state"><div class="icon">🔒</div><p>无权访问后台</p></div></div><button class="btn btn-outline" onclick="location.hash=\'\'" style="margin-top:10px">返回首页</button>';return;}
+  const data=loadData();const poll=data[pollId];
+  if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
+  const totalVotes=Object.keys(poll.voters).length;
+  app.innerHTML=`
+    <div class="card">
+      <div class="poll-header">
+        <div class="share-icon">🔒</div>
+        <h2>${esc(poll.title)}</h2>
+        ${poll.description?`<p>${esc(poll.description)}</p>`:''}
+        <div class="poll-meta">
+          <span class="meta-tag">投票码: ${esc(poll.voteCode)}</span>
+          <span class="meta-tag">共 ${totalVotes} 人参与</span>
+          <span class="meta-tag">${poll.closed?'已结束':'进行中'}</span>
+        </div>
+      </div>
+    </div>
+    <div class="admin-section"><h3>📊 投票结果</h3><div id="admin-results"></div></div>
+    <div class="admin-section"><h3>👥 投票者详情（${totalVotes}人）</h3><div id="voter-list"></div></div>
+    <div class="export-section">
+      <button class="btn btn-primary btn-sm" onclick="exportCSV()">📥 导出CSV</button>
+      <button class="btn btn-success btn-sm" onclick="exportJSON()">📥 导出JSON</button>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+      <button class="btn btn-outline" onclick="location.hash='results/${pollId}'" style="flex:1">📊 结果页</button>
+      <button class="btn btn-outline" onclick="location.hash=''" style="flex:1">返回首页</button>
+    </div>
+    ${!poll.closed?`
+      <button class="btn btn-primary btn-sm" onclick="location.hash='edit/${pollId}'" style="margin-top:10px;width:100%">✏️ 编辑投票</button>
+      <button class="btn btn-danger btn-sm" onclick="closePoll('${pollId}')" style="margin-top:10px;width:100%">🔒 结束投票</button>
+    `:''}`;
+  // 渲染结果
+  const resultsEl=$('#admin-results');
+  resultsEl.innerHTML=poll.questions.map((q,qi)=>{
+    const qTotal=q.options.reduce((s,o)=>s+o.votes,0);
+    const sortedOpts=[...q.options].sort((a,b)=>b.votes-a.votes);
+    return `<div class="result-question">
+      <h3><span class="q-badge">Q${qi+1}</span>${esc(q.title)} <span class="q-total">${qTotal}票</span></h3>
+      ${sortedOpts.map((o,i)=>{
+        const pct=qTotal>0?Math.round((o.votes/qTotal)*1000)/10:0;
+        const imgHtml=o.image?`<img class="result-img" src="${esc(o.image)}" onerror="this.style.display='none'">`:'';
+        return `<div class="result-item"><div class="result-header"><span class="text">${imgHtml}${esc(o.text)}</span><span class="count">${o.votes}票</span></div>
+          <div class="result-bar"><div class="result-fill" style="width:0%" data-w="${Math.max(pct,.5)}"><span class="percentage">${pct}%</span></div></div></div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+  // 渲染投票者列表（匿名）
+  const voterEl=$('#voter-list');
+  const voterEntries=Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp);
+  if(voterEntries.length===0){voterEl.innerHTML='<div class="empty-state" style="padding:20px"><p>暂无投票记录</p></div>';}
+  else{
+    voterEl.innerHTML=voterEntries.map(([code,voter],idx)=>{
+      const time=dateStr(voter.timestamp);
+      const sels=Object.entries(voter.selections).map(([qid,selectedIds])=>{
+        const q=poll.questions.find(x=>x.id===+qid);if(!q)return'';
+        const texts=q.options.filter(o=>selectedIds.includes(o.id)&&!o.isAllSelect).map(o=>o.text||'(图片选项)');
+        return `<div style="margin-bottom:4px"><strong>${esc(q.title)}:</strong> ${texts.map(s=>`<span class="sel-tag">${esc(s)}</span>`).join('')}</div>`;
+      }).join('');
+      return `<div class="voter-row">
+        <span class="voter-code">匿名${idx+1}</span>
+        <span class="voter-time">${time}</span>
+        <div class="voter-selections">${sels}</div>
+        <button onclick="deleteVote('${code}')" style="background:#fee;color:#e53935;border:none;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;margin-left:8px;flex-shrink:0">删除</button>
+      </div>`;
+    }).join('');
+  }
+  setTimeout(()=>{$$('.result-fill').forEach(b=>{b.style.width=b.dataset.w+'%';});},100);
+}
+
+// ========== EDIT ==========
+let ES={}; // 编辑状态
+
+function renderEdit(app){
+  const token=localStorage.getItem('ct_'+pollId);
+  if(!token){app.innerHTML='<div class="card"><div class="empty-state"><div class="icon">🔒</div><p>无权编辑此投票</p></div></div>';return;}
+
+  const data=loadData();
+  const poll=data[pollId];
+  if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
+
+  // 初始化编辑状态（从现有投票数据）
+  if(!ES.id||ES.id!==pollId){
+    ES={
+      id:pollId,
+      title:poll.title,
+      description:poll.description||'',
+      questions:poll.questions.map(q=>({
+        id:q.id,
+        title:q.title,
+        options:q.options.filter(o=>!o.isAllSelect).map(o=>({text:o.text,image:o.image||''})),
+        multipleChoice:q.multipleChoice,
+        maxVotes:q.maxVotes,
+        allSelectOption:q.hasAllSelect||false,
+      })),
+      startAt:poll.startAt?new Date(poll.startAt).toISOString().slice(0,16):'',
+      endAt:poll.endAt?new Date(poll.endAt).toISOString().slice(0,16):'',
+      showResultsBeforeEnd:poll.settings.showResultsBeforeEnd,
+    };
+  }
+
+  const now=new Date().toISOString().slice(0,16);
+  app.innerHTML=`
+    <div class="card">
+      <h2 style="font-size:18px;margin-bottom:16px">✏️ 编辑投票</h2>
+      <div class="form-group"><label>投票标题 *</label><input id="e-title" type="text" placeholder="例如：2025年度评选" maxlength="80" value="${esc(ES.title)}" oninput="ES.title=this.value"></div>
+      <div class="form-group"><label>描述（可选）</label><textarea id="e-desc" rows="2" placeholder="补充说明..." oninput="ES.description=this.value">${esc(ES.description)}</textarea></div>
+      <div class="form-group"><label>时间范围（可选）</label>
+        <div class="form-row">
+          <div class="form-group"><input type="datetime-local" id="e-start" value="${ES.startAt}" onchange="ES.startAt=this.value"><div class="hint">开始日期</div></div>
+          <div class="form-group"><input type="datetime-local" id="e-end" value="${ES.endAt}" min="${ES.startAt||now}" onchange="ES.endAt=this.value"><div class="hint">截止日期</div></div>
+        </div>
+      </div>
+      <div class="form-group"><label>投票设置</label>
+        <div class="card" style="padding:8px 12px;margin-bottom:0">
+          <div class="setting-item"><div class="setting-label">投票前显示结果<small>投票前是否能看到当前结果</small></div>
+            <label class="toggle"><input type="checkbox" id="e-showresult" ${ES.showResultsBeforeEnd?'checked':''}><span class="slider"></span></label></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin:16px 0"><span style="flex:1;height:1px;background:#e8e8e8"></span><span style="font-size:12px;color:#aaa">问题列表</span><span style="flex:1;height:1px;background:#e8e8e8"></span></div>
+      <div id="e-questions"></div>
+      <button class="add-option-btn" onclick="addEditQuestion()" style="margin-bottom:16px">+ 添加问题</button>
+      <button class="btn btn-primary" onclick="submitEdit()" id="edit-btn">💾 保存修改</button>
+      <button class="btn btn-outline" onclick="location.hash='admin/${pollId}'" style="margin-top:10px">取消返回</button>
+    </div>`;
+  renderEditQuestions();
+}
+
+function renderEditQuestions(){
+  const el=$('#e-questions');
+  el.innerHTML=ES.questions.map((q,qi)=>{
+    const ohtml=q.options.map((o,oi)=>`
+      <div class="option-row">
+        <div class="option-preview">${o.image?`<img src="${esc(o.image)}" onerror="this.parentElement.innerHTML='<div class=no-img>🖼️</div>'">`:'<div class="no-img">🖼️</div>'}</div>
+        <div class="option-inputs">
+          <input type="text" placeholder="选项${oi+1}文字" maxlength="60" value="${esc(o.text)}">
+          <div class="image-input-group">
+            <input type="text" placeholder="图片URL（可选）" value="${esc(o.image)}">
+            <label class="upload-btn">📷 上传<input type="file" accept="image/*" style="display:none" onchange="uploadEditImage(${qi},${oi},this)"></label>
+          </div>
+        </div>
+        ${q.options.length>1?`<button class="remove-btn" onclick="removeEditOpt(${qi},${oi})">×</button>`:''}
+      </div>`).join('');
+
+    const allSelectPreview=q.allSelectOption?`
+      <div class="option-row" style="background:#f0f3ff;border:2px dashed #667eea;border-radius:8px;padding:10px;margin-top:8px">
+        <div class="option-preview" style="background:#eef0ff"><div style="font-size:24px">☑</div></div>
+        <div class="option-inputs">
+          <input type="text" value="全选（点击选中所有选项）" disabled style="background:#eef0ff;color:#667eea;font-weight:600;border-color:#667eea">
+        </div>
+      </div>`:'';
+
+    return `
+      <div class="question-card" data-qi="${qi}">
+        <div class="q-header">
+          <span class="q-num">问题 ${qi+1}</span>
+          ${ES.questions.length>1?`<button class="q-remove" onclick="removeEditQuestion(${qi})">×</button>`:''}
+        </div>
+        <input class="q-title-input" type="text" placeholder="输入问题标题" maxlength="80" value="${esc(q.title)}">
+        <div id="e-opts-${qi}">${ohtml}</div>
+        ${allSelectPreview}
+        <button class="add-option-btn" onclick="addEditOpt(${qi})">+ 添加选项</button>
+        <div class="q-settings">
+          <label><input type="checkbox" class="multi-check" ${q.multipleChoice?'checked':''}> 多选</label>
+          <span class="multi-settings" style="${q.multipleChoice?'':'display:none'}">
+            最多 <input type="number" class="max-votes-input" min="0" max="10" value="${q.maxVotes}"> 项
+          </span>
+          <label class="all-select-settings" style="${q.multipleChoice?'':'display:none'}">
+            <input type="checkbox" class="all-select-check" ${q.allSelectOption?'checked':''}> 启用"全选"功能
+          </label>
+        </div>
+      </div>`;
+  }).join('');
+
+  // 绑定事件
+  $$('#e-questions .question-card').forEach((card,qi)=>{
+    const multiCheck=card.querySelector('.multi-check');
+    const allSelectCheck=card.querySelector('.all-select-check');
+    const multiSettings=card.querySelector('.multi-settings');
+    const allSelectSettings=card.querySelector('.all-select-settings');
+
+    if(multiCheck){
+      multiCheck.addEventListener('change',function(){
+        const checked=this.checked;
+        ES.questions[qi].multipleChoice=checked;
+        if(multiSettings)multiSettings.style.display=checked?'':'none';
+        if(allSelectSettings)allSelectSettings.style.display=checked?'':'none';
+        if(!checked){
+          ES.questions[qi].maxVotes=0;
+          ES.questions[qi].allSelectOption=false;
+          if(allSelectCheck)allSelectCheck.checked=false;
+        }
+      });
+    }
+
+    if(allSelectCheck){
+      allSelectCheck.addEventListener('change',function(){
+        ES.questions[qi].allSelectOption=this.checked;
+      });
+    }
+
+    const maxVotesInput=card.querySelector('.max-votes-input');
+    if(maxVotesInput){
+      maxVotesInput.addEventListener('change',function(){
+        ES.questions[qi].maxVotes=parseInt(this.value)||0;
+      });
+    }
+  });
+}
+
+function syncESFromDOM(){
+  const titleEl=$('#e-title');
+  const descEl=$('#e-desc');
+  if(titleEl)ES.title=titleEl.value;
+  if(descEl)ES.description=descEl.value;
+  ES.questions.forEach((q,qi)=>{
+    const titleInput=$(`#e-questions .question-card:nth-child(${qi+1}) .q-title-input`);
+    if(titleInput)q.title=titleInput.value;
+    const optsContainer=$(`#e-opts-${qi}`);
+    if(optsContainer){
+      const textInputs=optsContainer.querySelectorAll('input[type="text"]:not([placeholder*="图片"])');
+      textInputs.forEach((input,oi)=>{
+        if(q.options[oi])q.options[oi].text=input.value;
+      });
+      const imgInputs=optsContainer.querySelectorAll('input[placeholder*="图片"]');
+      imgInputs.forEach((input,oi)=>{
+        if(q.options[oi])q.options[oi].image=input.value;
+      });
+    }
+  });
+}
+
+window.addEditQuestion=function(){
+  syncESFromDOM();
+  if(ES.questions.length>=10){toast('最多10个问题');return;}
+  ES.questions.push({title:'',options:[{text:'',image:''}],multipleChoice:false,maxVotes:0,allSelectOption:false});
+  renderEditQuestions();
+  const cards=$$('#e-questions .question-card');cards[cards.length-1].scrollIntoView({behavior:'smooth',block:'center'});
+};
+window.removeEditQuestion=function(i){syncESFromDOM();ES.questions.splice(i,1);renderEditQuestions();};
+window.addEditOpt=function(qi){
+  syncESFromDOM();
+  if(ES.questions[qi].options.length>=10){toast('最多10个选项');return;}
+  ES.questions[qi].options.push({text:'',image:''});
+  renderEditQuestions();
+};
+window.removeEditOpt=function(qi,oi){syncESFromDOM();ES.questions[qi].options.splice(oi,1);renderEditQuestions();};
+
+window.uploadEditImage=function(qi,oi,input){
+  const file=input.files[0];
+  if(!file)return;
+  if(file.size>500*1024){toast('图片大小不能超过500KB');return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    ES.questions[qi].options[oi].image=e.target.result;
+    renderEditQuestions();
+  };
+  reader.readAsDataURL(file);
+};
+
+window.submitEdit=async function(){
+  syncESFromDOM();
+  const title=ES.title.trim();
+  const description=ES.description.trim();
+  if(!title){toast('请输入标题');$('#e-title').focus();return;}
+  for(let i=0;i<ES.questions.length;i++){
+    const q=ES.questions[i];
+    if(!q.title.trim()){toast(`问题${i+1}需要标题`);return;}
+    const validOpts=q.options.filter(o=>(o.text&&o.text.trim())||o.image);
+    if(validOpts.length<2){toast(`问题${i+1}"${q.title||'未命名'}"需要至少2个有效选项`);return;}
+  }
+  if(ES.startAt&&ES.endAt&&new Date(ES.startAt)>=new Date(ES.endAt)){toast('开始时间必须早于截止时间');return;}
+
+  const btn=$('#edit-btn');btn.disabled=true;btn.textContent='保存中...';
+
+  const data=loadData();
+  const poll=data[pollId];
+  if(!poll){toast('投票不存在');return;}
+
+  // 保留现有的投票数据，只更新设置
+  const questions=ES.questions.map((q,qi)=>{
+    const validOpts=q.options.filter(o=>o.text.trim()||o.image);
+    let options=validOpts.map((o,oi)=>{
+      // 尝试匹配现有选项的投票数
+      const existingOpt=poll.questions[qi]?.options.find(eo=>!eo.isAllSelect&&(eo.text===o.text||eo.image===o.image));
+      return{
+        id:oi+1,text:o.text.trim(),image:o.image||'',
+        votes:existingOpt?existingOpt.votes:0,
+        isAllSelect:false
+      };
+    });
+
+    if(q.allSelectOption&&q.multipleChoice){
+      // 保留全选选项的票数
+      const existingAllSel=poll.questions[qi]?.options.find(eo=>eo.isAllSelect);
+      options.push({
+        id:options.length+1,text:'全选',image:'',votes:existingAllSel?existingAllSel.votes:0,isAllSelect:true
+      });
+    }
+
+    return{
+      id:qi+1,title:q.title.trim(),options,
+      multipleChoice:q.multipleChoice,maxVotes:q.maxVotes,hasAllSelect:q.allSelectOption&&q.multipleChoice,
+    };
+  });
+
+  poll.title=title;
+  poll.description=description;
+  poll.questions=questions;
+  poll.startAt=ES.startAt?new Date(ES.startAt).getTime():null;
+  poll.endAt=ES.endAt?new Date(ES.endAt).getTime():null;
+  poll.settings.showResultsBeforeEnd=$('#e-showresult').checked;
+
+  data[pollId]=poll;
+  saveData(data);
+
+  ES={};
+  toast('修改已保存');
+  nav('admin',pollId);
+};
+
+// ========== 数据导出 ==========
+window.exportCSV=function(){
+  const data=loadData();const poll=data[pollId];if(!poll)return;
+  let csv='﻿投票标题,"'+poll.title+'"\n';
+  csv+='投票码,'+poll.voteCode+'\n';
+  csv+='创建时间,'+dateStr(poll.createdAt)+'\n';
+  csv+='总投票人数,'+Object.keys(poll.voters).length+'\n\n';
+  // 汇总结果
+  csv+='=== 汇总结果 ===\n';
+  poll.questions.forEach((q,qi)=>{
+    csv+='\n问题'+(qi+1)+',"'+q.title+'"\n';
+    csv+='选项,票数,百分比\n';
+    const qTotal=q.options.reduce((s,o)=>s+o.votes,0);
+    q.options.forEach(o=>{
+      const pct=qTotal>0?Math.round((o.votes/qTotal)*1000)/10:0;
+      csv+='"'+(o.text||'(图片)')+'",'+o.votes+','+pct+'%\n';
+    });
+  });
+  // 详细投票记录（匿名）
+  csv+='\n=== 详细投票记录（匿名） ===\n';
+  csv+='投票编号,投票时间';
+  poll.questions.forEach((q,qi)=>{csv+=',问题'+(qi+1)+':'+q.title;});
+  csv+='\n';
+  Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp).forEach(([code,voter],idx)=>{
+    csv+='匿名'+(idx+1)+','+dateStr(voter.timestamp);
+    poll.questions.forEach(q=>{
+      const sel=(voter.selections[q.id]||[]).map(id=>{const o=q.options.find(x=>x.id===id);return o?(o.text||'(图片)'):'';}).filter(Boolean).join('; ');
+      csv+=',"'+sel+'"';
+    });
+    csv+='\n';
+  });
+  downloadFile(csv,'投票数据_'+poll.title+'.csv','text/csv;charset=utf-8');
+  toast('CSV已导出');
+};
+
+window.exportJSON=function(){
+  const data=loadData();const poll=data[pollId];if(!poll)return;
+  const exportData={
+    title:poll.title,description:poll.description,voteCode:poll.voteCode,
+    createdAt:dateStr(poll.createdAt),startAt:poll.startAt?dateStr(poll.startAt):null,endAt:poll.endAt?dateStr(poll.endAt):null,
+    totalVoters:Object.keys(poll.voters).length,closed:poll.closed,
+    questions:poll.questions.map(q=>{
+      const qTotal=q.options.reduce((s,o)=>s+o.votes,0);
+      return{id:q.id,title:q.title,multipleChoice:q.multipleChoice,
+        options:q.options.map(o=>({id:o.id,text:o.text,hasImage:!!o.image,votes:o.votes,percentage:qTotal>0?Math.round((o.votes/qTotal)*1000)/10:0})),
+      };
+    }),
+    voters:Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp).map(([code,voter],idx)=>{
+      const record={code:'匿名'+(idx+1),timestamp:dateStr(voter.timestamp),selections:{}};
+      poll.questions.forEach(q=>{
+        record.selections[q.title]=(voter.selections[q.id]||[]).map(id=>{const o=q.options.find(x=>x.id===id);return o?(o.text||'(图片)'):'';}).filter(Boolean);
+      });
+      return record;
+    }),
+  };
+  const json=JSON.stringify(exportData,null,2);
+  downloadFile(json,'投票数据_'+poll.title+'.json','application/json');
+  toast('JSON已导出');
+};
+
+function downloadFile(content,filename,type){
+  const blob=new Blob([content],{type:type});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+// ========== INIT ==========
+handleHash();
+})();
+</script>
+</body>
+</html>
