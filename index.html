@@ -247,23 +247,25 @@ function render(){
 
 // ========== HOME ==========
 async function renderHome(app){
-  // 先显示缓存数据，再后台刷新
+  const isCreatorMode=localStorage.getItem('creator_mode')==='true';
+  // 先用缓存渲染
   const cachedPolls=localStorage.getItem('vote_polls_cache');
   if(cachedPolls){
-    try{
-      const polls=JSON.parse(cachedPolls);
-      renderHomeList(app,polls);
-    }catch(e){}
+    try{renderHomeList(app,JSON.parse(cachedPolls),isCreatorMode);}catch(e){}
   }else{
-    app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+    // 没有缓存时显示加载中
+    app.innerHTML=`
+      <div class="hero"><div class="hero-icon">🗳️</div><h2>发起一个投票</h2><p>支持多题、图片选项、全选、日期限制</p></div>
+      ${isCreatorMode?`<button class="btn btn-primary" onclick="location.hash='create'" style="margin-bottom:10px">➕ 创建投票</button><button class="btn btn-danger" onclick="exitCreatorMode()" style="margin-bottom:20px">🔒 退出发起者模式</button>`:`<button class="btn btn-primary" onclick="location.hash='create'" style="margin-bottom:10px">➕ 创建投票</button><button class="btn btn-outline" onclick="enterCreatorMode()" style="margin-bottom:20px">🔑 发起者模式</button>`}
+      <div id="pl"><div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div></div>`;
   }
   // 后台刷新
   try{
     const polls=await loadPolls();
     localStorage.setItem('vote_polls_cache',JSON.stringify(polls));
-    renderHomeList(app,polls);
+    renderHomeList(app,polls,isCreatorMode);
   }catch(e){
-    if(!cachedPolls)app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>加载失败，请刷新重试</p></div>';
+    console.error('首页刷新失败:',e);
   }
 }
 
