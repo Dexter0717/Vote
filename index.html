@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>投票</title>
+  <title>投票（云数据版）</title>
+  <script src="supabase.js"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:#f0f2f5;color:#1a1a2e;line-height:1.6;min-height:100vh}
@@ -162,7 +163,7 @@
 </head>
 <body>
   <div class="header">
-    <h1>🗳️ 投票</h1>
+    <h1>🗳️ 投票（云数据版）v1.3</h1>
   </div>
   <div class="container" id="app"></div>
 
@@ -179,9 +180,40 @@ function toast(m){const t=document.createElement('div');t.className='toast';t.te
 function timeAgo(ts){const d=Date.now()-ts;if(d<6e4)return'刚刚';if(d<36e5)return Math.floor(d/6e4)+'分钟前';if(d<864e5)return Math.floor(d/36e5)+'小时前';return Math.floor(d/864e5)+'天前';}
 function dateStr(ts){if(!ts)return'';const d=new Date(ts);return d.toLocaleDateString('zh-CN',{month:'numeric',day:'numeric'})+' '+d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});}
 
-const STORAGE_KEY = 'vote_app_data';
-function loadData(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{};}catch{return {};}}
-function saveData(data){localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}
+// ========== Supabase 初始化 ==========
+const supabaseUrl = 'https://dfkfhkmoshaxlyyoiqgp.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRma2Zoa21vc2hheGx5eW9pcWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MDQwMzIsImV4cCI6MjEwMDk4MDAzMn0.qV7gPKMFki1ayh6R9S2vAdyUQqiIoQGkXa2008mX5Sw';
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+// 数据库操作 + 本地缓存
+let pollCache={}; // 本地缓存，避免每次点击都调API
+
+async function loadPolls(){
+  const {data,error}=await supabase.from('polls').select('*').order('created_at',{ascending:false});
+  if(error){console.error('加载失败:',error);return[];}
+  return data||[];
+}
+async function getPoll(id){
+  // 优先用缓存，减少API调用
+  if(pollCache[id])return pollCache[id];
+  const {data,error}=await supabase.from('polls').select('*').eq('id',id).single();
+  if(error){console.error('获取投票失败:',error);return null;}
+  pollCache[id]=data;
+  return data;
+}
+function getCachedPoll(id){return pollCache[id]||null;} // 同步获取缓存
+async function savePoll(poll){
+  const {error}=await supabase.from('polls').upsert(poll,{onConflict:'id'});
+  if(error){console.error('保存失败:',error);return false;}
+  pollCache[poll.id]=poll; // 更新缓存
+  return true;
+}
+async function deletePoll(id){
+  const {error}=await supabase.from('polls').delete().eq('id',id);
+  if(error){console.error('删除失败:',error);return false;}
+  delete pollCache[id];
+  return true;
+}
 
 let currentVoteCode = localStorage.getItem('vote_current_code') || '';
 
@@ -204,11 +236,28 @@ function render(){
 }
 
 // ========== HOME ==========
-function renderHome(app){
-  const data=loadData();
-  const polls=Object.values(data).sort((a,b)=>b.createdAt-a.createdAt);
+async function renderHome(app){
+  // 先显示缓存数据，再后台刷新
+  const cachedPolls=localStorage.getItem('vote_polls_cache');
+  if(cachedPolls){
+    try{
+      const polls=JSON.parse(cachedPolls);
+      renderHomeList(app,polls);
+    }catch(e){}
+  }else{
+    app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  }
+  // 后台刷新
+  try{
+    const polls=await loadPolls();
+    localStorage.setItem('vote_polls_cache',JSON.stringify(polls));
+    renderHomeList(app,polls);
+  }catch(e){
+    if(!cachedPolls)app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>加载失败，请刷新重试</p></div>';
+  }
+}
 
-  // 检查是否是发起者模式
+function renderHomeList(app,polls){
   const isCreatorMode=localStorage.getItem('creator_mode')==='true';
 
   app.innerHTML=`
@@ -231,16 +280,16 @@ function renderHome(app){
     const now=Date.now();
     let statusText='',badgeClass='badge-active';
     if(p.closed){statusText='已结束';badgeClass='badge-closed';}
-    else if(p.endAt&&now>p.endAt){statusText='已过期';badgeClass='badge-closed';}
-    else if(p.startAt&&now<p.startAt){statusText='未开始';badgeClass='badge-closed';}
-    else{statusText=p.endAt?'截止 '+dateStr(p.endAt):'进行中';}
+    else if(p.end_at&&now>p.end_at){statusText='已过期';badgeClass='badge-closed';}
+    else if(p.start_at&&now<p.start_at){statusText='未开始';badgeClass='badge-closed';}
+    else{statusText=p.end_at?'截止 '+dateStr(p.end_at):'进行中';}
 
     const isCreator=isPollCreator(p.id);
-    const isCreatorMode=localStorage.getItem('creator_mode')==='true';
     const showEdit=isCreator&&isCreatorMode;
+    const voterCount=Object.keys(p.voters||{}).length;
 
     return `<div class="poll-list-item" onclick="location.hash='vote/${p.id}'">
-      <div class="info"><h3>${esc(p.title)}${showEdit?' 🔑':''}</h3><p>${p.questions.length}题 · ${Object.keys(p.voters||{}).length}人已投 · ${timeAgo(p.createdAt)}</p></div>
+      <div class="info"><h3>${esc(p.title)}${showEdit?' 🔑':''}</h3><p>${p.questions.length}题 · ${voterCount}人已投 · ${timeAgo(p.created_at)}</p></div>
       <div style="display:flex;gap:6px;align-items:center">
         ${showEdit?`<button onclick="event.stopPropagation();location.hash='admin/${p.id}'" style="background:#667eea;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer">管理</button>`:''}
         <span class="badge ${badgeClass}">${statusText}</span>
@@ -491,9 +540,8 @@ window.submitCreate=async function(){
   if(!title){toast('请输入标题');$('#c-title').focus();return;}
   for(let i=0;i<CS.questions.length;i++){
     const q=CS.questions[i];
-    syncCSFromDOM(); // 每次循环都同步一次确保状态正确
+    syncCSFromDOM();
     if(!q.title.trim()){toast(`问题${i+1}需要标题`);return;}
-    // 过滤掉空选项
     const validOpts=q.options.filter(o=>(o.text&&o.text.trim())||o.image);
     if(validOpts.length<2){toast(`问题${i+1}"${q.title||'未命名'}"需要至少2个有效选项`);return;}
   }
@@ -503,20 +551,14 @@ window.submitCreate=async function(){
   const id=genId(10);
   const creatorToken=genId(32);
 
-  // 构建问题，处理全选选项
   const questions=CS.questions.map((q,qi)=>{
     const validOpts=q.options.filter(o=>o.text.trim()||o.image);
     let options=validOpts.map((o,i)=>({
       id:i+1,text:o.text.trim(),image:o.image||'',votes:0,isAllSelect:false
     }));
-
-    // 如果启用了全选功能，添加全选选项（放在最后）
     if(q.allSelectOption&&q.multipleChoice){
-      options.push({
-        id:options.length+1,text:'全选',image:'',votes:0,isAllSelect:true
-      });
+      options.push({id:options.length+1,text:'全选',image:'',votes:0,isAllSelect:true});
     }
-
     return{
       id:qi+1,title:q.title.trim(),options,
       multipleChoice:q.multipleChoice,maxVotes:q.maxVotes,hasAllSelect:q.allSelectOption&&q.multipleChoice,
@@ -524,15 +566,18 @@ window.submitCreate=async function(){
   });
 
   const poll={
-    id,title:title.trim(),titleImages:CS.titleImages,description:description.trim(),
+    id,title:title.trim(),title_images:CS.titleImages,description:description.trim(),
     questions,
     settings:{showResultsBeforeEnd:$('#c-showresult').checked},
-    voteCode,voters:{},createdAt:Date.now(),
-    startAt:startVal?new Date(startVal).getTime():null,
-    endAt:endVal?new Date(endVal).getTime():null,
-    closed:false,creatorToken,
+    vote_code:voteCode,voters:{},created_at:Date.now(),
+    start_at:startVal?new Date(startVal).getTime():null,
+    end_at:endVal?new Date(endVal).getTime():null,
+    closed:false,creator_token:creatorToken,
   };
-  const data=loadData();data[id]=poll;saveData(data);
+
+  const ok=await savePoll(poll);
+  if(!ok){toast('创建失败，请重试');btn.disabled=false;btn.textContent='🚀 发起投票';return;}
+
   localStorage.setItem('ct_'+id,creatorToken);
   pollId=id;
   CS={title:'',titleImages:[],description:'',questions:[{title:'',options:[{text:'',image:''}],multipleChoice:false,maxVotes:0,allSelectOption:false}],startAt:'',endAt:'',showResultsBeforeEnd:true};
@@ -540,9 +585,8 @@ window.submitCreate=async function(){
 };
 
 // ========== SHARE ==========
-function renderShare(app){
-  const data=loadData();
-  const poll=data[pollId];
+async function renderShare(app){
+  const poll=await getPoll(pollId);
   if(!poll){nav('home');return;}
   const url=location.origin+location.pathname+'#vote/'+pollId;
   app.innerHTML=`
@@ -558,8 +602,16 @@ function renderShare(app){
       </div>
       <div style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0">
         <p style="color:#999;font-size:12px;margin-bottom:6px">投票码（投票者需输入此码）</p>
-        <div class="vote-code-display">${poll.voteCode}</div>
+        <div class="vote-code-display">${poll.vote_code}</div>
         <button class="copy-btn" onclick="copyCode()" id="copy-code-btn" style="margin-top:8px">📋 复制投票码</button>
+      </div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0">
+        <button class="copy-btn" onclick="showQRCode()" id="qr-btn" style="background:#764ba2">📱 生成二维码</button>
+        <div id="qr-container" style="margin-top:12px;display:none">
+          <p style="color:#999;font-size:12px;margin-bottom:8px">扫码也可以直接投票</p>
+          <img id="qr-img" style="width:180px;height:180px;border-radius:12px;border:2px solid #e8e8e8" alt="投票二维码">
+          <div style="margin-top:8px"><button class="copy-btn" onclick="saveQRCode()" style="background:#38ef7d">💾 保存二维码</button></div>
+        </div>
       </div>
     </div></div>
     <div style="display:flex;gap:10px">
@@ -573,73 +625,91 @@ window.copyUrl=function(){
   const url=location.origin+location.pathname+'#vote/'+pollId;
   navigator.clipboard.writeText(url).then(()=>{const b=$('#copy-btn');b.textContent='✅ 已复制';b.classList.add('copied');setTimeout(()=>{b.textContent='📋 复制链接';b.classList.remove('copied');},2000);}).catch(()=>{toast('复制失败');});
 };
-window.copyCode=function(){
-  const data=loadData();const poll=data[pollId];if(!poll)return;
-  navigator.clipboard.writeText(poll.voteCode).then(()=>{const b=$('#copy-code-btn');b.textContent='✅ 已复制';b.classList.add('copied');setTimeout(()=>{b.textContent='📋 复制投票码';b.classList.remove('copied');},2000);}).catch(()=>{toast('复制失败');});
+window.copyCode=async function(){
+  const poll=await getPoll(pollId);if(!poll)return;
+  navigator.clipboard.writeText(poll.vote_code).then(()=>{const b=$('#copy-code-btn');b.textContent='✅ 已复制';b.classList.add('copied');setTimeout(()=>{b.textContent='📋 复制投票码';b.classList.remove('copied');},2000);}).catch(()=>{toast('复制失败');});
+};
+
+window.showQRCode=function(){
+  const url=location.origin+location.pathname+'#vote/'+pollId;
+  const qrUrl='https://api.qrserver.com/v1/create-qr-code/?data='+encodeURIComponent(url)+'&size=200x200';
+  const container=$('#qr-container');
+  const img=$('#qr-img');
+  const btn=$('#qr-btn');
+  if(container.style.display==='none'){
+    img.src=qrUrl;
+    container.style.display='block';
+    btn.textContent='📱 隐藏二维码';
+  }else{
+    container.style.display='none';
+    btn.textContent='📱 生成二维码';
+  }
+};
+
+window.saveQRCode=function(){
+  const img=$('#qr-img');
+  if(!img||!img.src)return;
+  const a=document.createElement('a');
+  a.href=img.src;
+  a.download='投票二维码_'+pollId+'.png';
+  a.target='_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  toast('正在下载二维码...');
 };
 
 // ========== VOTE ==========
 let selections={};
 async function renderVote(app){
   app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
-  const data=loadData();const poll=data[pollId];
+  // 清除缓存强制刷新
+  delete pollCache[pollId];
+  const poll=await getPoll(pollId);
   if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
   const now=Date.now();
-  if(poll.closed||(poll.endAt&&now>poll.endAt)){
-    // 创建者可以进入后台
+  if(poll.closed||(poll.end_at&&now>poll.end_at)){
     if(localStorage.getItem('ct_'+pollId)){
       app.innerHTML=`
-        <div class="card">
-          <div class="empty-state">
-            <div class="icon">⏰</div>
-            <p>投票已结束</p>
-          </div>
-        </div>
+        <div class="card"><div class="empty-state"><div class="icon">⏰</div><p>投票已结束</p></div></div>
         <button class="btn btn-primary" onclick="location.hash='admin/${pollId}'" style="margin-bottom:10px">🔒 进入后台</button>
         <button class="btn btn-outline" onclick="location.hash='results/${pollId}'">📊 查看结果</button>`;
       return;
     }
     nav('results');return;
   }
-  if(poll.startAt&&now<poll.startAt){
+  if(poll.start_at&&now<poll.start_at){
     const isCreator=isPollCreator(pollId);
-    app.innerHTML=`<div class="card"><div class="empty-state"><div class="icon">⏰</div><p>投票尚未开始</p><p style="font-size:13px;color:#999">开始时间：${dateStr(poll.startAt)}</p></div></div>
-    ${isCreator?`<button class="btn btn-primary" onclick="location.hash='admin/${pollId}'" style="margin-bottom:10px">🔑 进入后台管理</button>
+    const isCreatorMode=localStorage.getItem('creator_mode')==='true';
+    const showEditBtn=isCreator&&isCreatorMode;
+    app.innerHTML=`<div class="card"><div class="empty-state"><div class="icon">⏰</div><p>投票尚未开始</p><p style="font-size:13px;color:#999">开始时间：${dateStr(poll.start_at)}</p></div></div>
+    ${showEditBtn?`<button class="btn btn-primary" onclick="location.hash='admin/${pollId}'" style="margin-bottom:10px">🔑 进入后台管理</button>
     <button class="btn btn-outline" onclick="location.hash='edit/${pollId}'" style="margin-bottom:10px">✏️ 编辑投票</button>`:''}
     <button class="btn btn-outline" onclick="location.hash=''">返回首页</button>`;
     return;
   }
-  if(currentVoteCode&&poll.voters[currentVoteCode]){
-    // 已投票，但创建者可以进入后台
-    if(localStorage.getItem('ct_'+pollId)){
-      renderVoteForm(app,poll,true);
-      return;
-    }
+  // 用浏览器指纹检查是否已投票
+  let fp=localStorage.getItem('vote_fp');
+  if(fp&&poll.voters[fp]){
+    if(localStorage.getItem('ct_'+pollId)){renderVoteForm(app,poll,true);return;}
     nav('results');return;
   }
   renderVoteForm(app,poll,false);
 }
 function renderVoteForm(app,poll,hasVoted=false){
   selections={};poll.questions.forEach(q=>selections[q.id]=new Set());
-  const startTxt=poll.startAt?'⏰ 开始 '+dateStr(poll.startAt):'';
-  const endTxt=poll.endAt?'截止 '+dateStr(poll.endAt):'';
+  const startTxt=poll.start_at?'⏰ 开始 '+dateStr(poll.start_at):'';
+  const endTxt=poll.end_at?'截止 '+dateStr(poll.end_at):'';
   const timeTxt=[startTxt,endTxt].filter(Boolean).join(' ~ ');
   const isCreator=!!localStorage.getItem('ct_'+pollId);
+  const titleImages=poll.title_images||[];
 
   if(hasVoted){
-    // 已投票，显示提示和按钮
     app.innerHTML=`
-      <div class="card">
-        <div class="poll-header">
-          <div class="success-icon">✅</div>
-          <h2>${esc(poll.title)}</h2>
-          ${poll.description?`<p>${esc(poll.description)}</p>`:''}
-        </div>
-        <div style="text-align:center;padding:20px">
-          <p style="font-size:16px;color:#333;margin-bottom:8px">你已经投过票了</p>
-          <p style="font-size:13px;color:#999">投票码：${esc(currentVoteCode)}</p>
-        </div>
-      </div>
+      <div class="card"><div class="poll-header"><div class="success-icon">✅</div><h2>${esc(poll.title)}</h2>
+        ${poll.description?`<p>${esc(poll.description)}</p>`:''}</div>
+        <div style="text-align:center;padding:20px"><p style="font-size:16px;color:#333;margin-bottom:8px">你已经投过票了</p>
+        <p style="font-size:13px;color:#999">投票码：${esc(currentVoteCode)}</p></div></div>
       <button class="btn btn-primary" onclick="location.hash='results/${poll.id}'" style="margin-bottom:10px">📊 查看结果</button>
       ${isCreator?`<button class="btn btn-success" onclick="location.hash='admin/${poll.id}'">🔒 进入后台</button>`:''}
       <button class="btn btn-outline" onclick="location.hash=''" style="margin-top:10px">返回首页</button>`;
@@ -649,13 +719,10 @@ function renderVoteForm(app,poll,hasVoted=false){
   app.innerHTML=`
     <div class="card">
       <div class="poll-header">
-        ${poll.titleImages&&poll.titleImages.length?`<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:12px">${poll.titleImages.map(img=>`<img src="${esc(img)}" style="max-width:200px;max-height:150px;border-radius:8px;object-fit:cover">`).join('')}</div>`:''}
+        ${titleImages.length?`<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:12px">${titleImages.map(img=>`<img src="${esc(img)}" style="max-width:200px;max-height:150px;border-radius:8px;object-fit:cover">`).join('')}</div>`:''}
         <h2>${esc(poll.title)}</h2>
         ${poll.description?`<p>${esc(poll.description)}</p>`:''}
-        <div class="poll-meta">
-          <span class="meta-tag">${poll.questions.length}个问题</span>
-          ${timeTxt?`<span class="meta-tag">${timeTxt}</span>`:''}
-        </div>
+        <div class="poll-meta"><span class="meta-tag">${poll.questions.length}个问题</span>${timeTxt?`<span class="meta-tag">${timeTxt}</span>`:''}</div>
       </div>
       <div class="form-group" style="margin-bottom:16px">
         <label>🔑 输入投票码</label>
@@ -693,7 +760,7 @@ function renderVoteQuestions(poll){
   }).join('');
 }
 window.toggleOpt=function(qid,oid){
-  const data=loadData();const poll=data[pollId];if(!poll)return;
+  const poll=getCachedPoll(pollId);if(!poll)return;
   const q=poll.questions.find(x=>x.id===qid);if(!q)return;
   const clickedOpt=q.options.find(o=>o.id===oid);
 
@@ -737,7 +804,7 @@ window.toggleOpt=function(qid,oid){
   updateVoteBtn();
 };
 function updateVoteBtn(){
-  const data=loadData();const poll=data[pollId];if(!poll)return;
+  const poll=getCachedPoll(pollId);if(!poll)return;
   // 直接从输入框获取值
   const codeInput=$('#vote-code-input');
   const code=codeInput?codeInput.value.trim():currentVoteCode.trim();
@@ -755,14 +822,17 @@ function updateVoteBtn(){
   }
 }
 window.submitVote=async function(){
-  // 直接从输入框获取投票码
   const codeInput=$('#vote-code-input');
   const code=codeInput?codeInput.value.trim().toUpperCase():'';
   if(!code||code.length!==6){toast('请输入6位投票码');if(codeInput)codeInput.focus();return;}
-  // 更新全局变量
   currentVoteCode=code;
-  const data=loadData();const poll=data[pollId];if(!poll)return;
-  if(poll.voters[code]){toast('该投票码已使用过');return;}
+  delete pollCache[pollId];
+  const poll=await getPoll(pollId);if(!poll)return;
+  if(poll.vote_code!==code){toast('投票码错误');return;}
+  // 用浏览器指纹防止同一设备重复投票
+  let fp=localStorage.getItem('vote_fp');
+  if(!fp){fp='fp_'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('vote_fp',fp);}
+  if(poll.voters[fp]){toast('你已经投过票了');return;}
   const allAnswered=poll.questions.every(q=>selections[q.id]&&selections[q.id].size>0);
   if(!allAnswered){toast('请完成所有问题');return;}
   const btn=$('#vote-btn');btn.disabled=true;btn.textContent='提交中...';
@@ -775,25 +845,32 @@ window.submitVote=async function(){
     if(q.maxVotes>0&&valid.length>q.maxVotes){toast(`"${q.title}"最多只能选${q.maxVotes}项`);btn.disabled=false;btn.textContent='🗳️ 提交投票';return;}
     finalSelections[q.id]=valid;
   }
-  poll.voters[code]={selections:finalSelections,timestamp:Date.now()};
+  poll.voters[fp]={selections:finalSelections,timestamp:Date.now(),code:code};
   for(const q of poll.questions){for(const optId of (finalSelections[q.id]||[])){const opt=q.options.find(o=>o.id===optId);if(opt)opt.votes++;}}
-  const data2=loadData();data2[pollId]=poll;saveData(data2);
+  const ok=await savePoll(poll);
+  if(!ok){toast('投票失败，请重试');btn.disabled=false;btn.textContent='🗳️ 提交投票';return;}
+  localStorage.setItem('vote_current_code',code);
   toast('投票成功！');nav('results');
 };
 
 // ========== RESULTS ==========
 async function renderResults(app){
   app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
-  const data=loadData();const poll=data[pollId];
+  delete pollCache[pollId];
+  const poll=await getPoll(pollId);
   if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
   const totalVotes=Object.keys(poll.voters).length;
   const isCreator=!!localStorage.getItem('ct_'+pollId);
+  const isCreatorMode=localStorage.getItem('creator_mode')==='true';
+  const showEditBtn=isCreator&&isCreatorMode;
   let mySel={};
-  if(currentVoteCode&&poll.voters[currentVoteCode]){mySel=poll.voters[currentVoteCode].selections||{};}
+  let fp=localStorage.getItem('vote_fp');
+  if(fp&&poll.voters[fp]){mySel=poll.voters[fp].selections||{};}
+  const titleImages=poll.title_images||[];
   app.innerHTML=`
     <div class="card">
       <div class="poll-header">
-        ${poll.titleImages&&poll.titleImages.length?`<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:12px">${poll.titleImages.map(img=>`<img src="${esc(img)}" style="max-width:200px;max-height:150px;border-radius:8px;object-fit:cover">`).join('')}</div>`:''}
+        ${titleImages.length?`<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:12px">${titleImages.map(img=>`<img src="${esc(img)}" style="max-width:200px;max-height:150px;border-radius:8px;object-fit:cover">`).join('')}</div>`:''}
         <div class="success-icon">🎉</div>
         <h2>${esc(poll.title)}</h2>
         ${poll.description?`<p>${esc(poll.description)}</p>`:''}
@@ -805,8 +882,8 @@ async function renderResults(app){
       ${!poll.closed?`<button class="btn btn-primary" onclick="location.hash='vote/${poll.id}'" style="flex:1">🗳️ 去投票</button>`:''}
       <button class="btn btn-outline" onclick="location.hash=''" style="flex:1">返回首页</button>
     </div>
-    ${isCreator?`<button class="btn btn-danger btn-sm" onclick="closePoll('${poll.id}')" style="margin-top:10px;width:100%" ${poll.closed?'disabled':''}>${poll.closed?'已结束':'🔒 结束投票'}</button>`:''}
-    ${isCreator?`<button class="btn btn-primary btn-sm" onclick="location.hash='admin/${poll.id}'" style="margin-top:10px;width:100%">👥 查看投票详情</button>`:''}`;
+    ${showEditBtn?`<button class="btn btn-danger btn-sm" onclick="closePoll('${poll.id}')" style="margin-top:10px;width:100%" ${poll.closed?'disabled':''}>${poll.closed?'已结束':'🔒 结束投票'}</button>`:''}
+    ${showEditBtn?`<button class="btn btn-primary btn-sm" onclick="location.hash='admin/${poll.id}'" style="margin-top:10px;width:100%">👥 查看投票详情</button>`:''}`;
   const el=$('#result-items');
   el.innerHTML=poll.questions.map((q,qi)=>{
     const qTotal=q.options.reduce((s,o)=>s+o.votes,0);
@@ -829,17 +906,17 @@ async function renderResults(app){
 window.closePoll=async function(id){
   const t=localStorage.getItem('ct_'+id);if(!t){toast('无权操作');return;}
   if(!confirm('确定结束投票？'))return;
-  const data=loadData();const poll=data[id];if(!poll)return;
-  poll.closed=true;data[id]=poll;saveData(data);
+  const poll=await getPoll(id);if(!poll)return;
+  poll.closed=true;
+  await savePoll(poll);
   toast('已结束');nav('results');
 };
 
-window.deleteVote=function(code){
+window.deleteVote=async function(code){
   if(!confirm('确定删除这条投票记录？'))return;
-  const data=loadData();const poll=data[pollId];if(!poll)return;
+  const poll=await getPoll(pollId);if(!poll)return;
   const voter=poll.voters[code];
   if(!voter){toast('投票记录不存在');return;}
-  // 回退票数
   for(const q of poll.questions){
     const selectedIds=voter.selections[q.id]||[];
     for(const optId of selectedIds){
@@ -848,7 +925,7 @@ window.deleteVote=function(code){
     }
   }
   delete poll.voters[code];
-  data[pollId]=poll;saveData(data);
+  await savePoll(poll);
   toast('已删除');
   renderAdmin($('#app'));
 };
@@ -858,7 +935,8 @@ async function renderAdmin(app){
   app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
   const token=localStorage.getItem('ct_'+pollId);
   if(!token){app.innerHTML='<div class="card"><div class="empty-state"><div class="icon">🔒</div><p>无权访问后台</p></div></div><button class="btn btn-outline" onclick="location.hash=\'\'" style="margin-top:10px">返回首页</button>';return;}
-  const data=loadData();const poll=data[pollId];
+  delete pollCache[pollId];
+  const poll=await getPoll(pollId);
   if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
   const totalVotes=Object.keys(poll.voters).length;
   app.innerHTML=`
@@ -868,7 +946,7 @@ async function renderAdmin(app){
         <h2>${esc(poll.title)}</h2>
         ${poll.description?`<p>${esc(poll.description)}</p>`:''}
         <div class="poll-meta">
-          <span class="meta-tag">投票码: ${esc(poll.voteCode)}</span>
+          <span class="meta-tag">投票码: ${esc(poll.vote_code)}</span>
           <span class="meta-tag">共 ${totalVotes} 人参与</span>
           <span class="meta-tag">${poll.closed?'已结束':'进行中'}</span>
         </div>
@@ -884,11 +962,14 @@ async function renderAdmin(app){
       <button class="btn btn-outline" onclick="location.hash='results/${pollId}'" style="flex:1">📊 结果页</button>
       <button class="btn btn-outline" onclick="location.hash=''" style="flex:1">返回首页</button>
     </div>
+    <div style="text-align:center;margin-top:16px">
+      <p style="color:#999;font-size:12px;margin-bottom:8px">分享二维码</p>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent('https://dexter0717.github.io/Vote/#vote/'+pollId)}&size=120x120" style="width:120px;height:120px;border-radius:8px;border:1px solid #e8e8e8" alt="二维码">
+    </div>
     ${!poll.closed?`
       <button class="btn btn-primary btn-sm" onclick="location.hash='edit/${pollId}'" style="margin-top:10px;width:100%">✏️ 编辑投票</button>
       <button class="btn btn-danger btn-sm" onclick="closePoll('${pollId}')" style="margin-top:10px;width:100%">🔒 结束投票</button>
     `:''}`;
-  // 渲染结果
   const resultsEl=$('#admin-results');
   resultsEl.innerHTML=poll.questions.map((q,qi)=>{
     const qTotal=q.options.reduce((s,o)=>s+o.votes,0);
@@ -903,13 +984,13 @@ async function renderAdmin(app){
       }).join('')}
     </div>`;
   }).join('');
-  // 渲染投票者列表（匿名）
   const voterEl=$('#voter-list');
   const voterEntries=Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp);
   if(voterEntries.length===0){voterEl.innerHTML='<div class="empty-state" style="padding:20px"><p>暂无投票记录</p></div>';}
   else{
     voterEl.innerHTML=voterEntries.map(([code,voter],idx)=>{
       const time=dateStr(voter.timestamp);
+      const voterCode=voter.code||'未知';
       const sels=Object.entries(voter.selections).map(([qid,selectedIds])=>{
         const q=poll.questions.find(x=>x.id===+qid);if(!q)return'';
         const texts=q.options.filter(o=>selectedIds.includes(o.id)&&!o.isAllSelect).map(o=>o.text||'(图片选项)');
@@ -927,21 +1008,21 @@ async function renderAdmin(app){
 }
 
 // ========== EDIT ==========
-let ES={}; // 编辑状态
+let ES={};
 
-function renderEdit(app){
+async function renderEdit(app){
   const token=localStorage.getItem('ct_'+pollId);
   if(!token){app.innerHTML='<div class="card"><div class="empty-state"><div class="icon">🔒</div><p>无权编辑此投票</p></div></div>';return;}
 
-  const data=loadData();
-  const poll=data[pollId];
+  delete pollCache[pollId];
+  const poll=await getPoll(pollId);
   if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
 
-  // 初始化编辑状态（从现有投票数据）
   if(!ES.id||ES.id!==pollId){
     ES={
       id:pollId,
       title:poll.title,
+      titleImages:poll.title_images||[],
       description:poll.description||'',
       questions:poll.questions.map(q=>({
         id:q.id,
@@ -951,17 +1032,27 @@ function renderEdit(app){
         maxVotes:q.maxVotes,
         allSelectOption:q.hasAllSelect||false,
       })),
-      startAt:poll.startAt?new Date(poll.startAt).toISOString().slice(0,16):'',
-      endAt:poll.endAt?new Date(poll.endAt).toISOString().slice(0,16):'',
+      startAt:poll.start_at?new Date(poll.start_at).toISOString().slice(0,16):'',
+      endAt:poll.end_at?new Date(poll.end_at).toISOString().slice(0,16):'',
       showResultsBeforeEnd:poll.settings.showResultsBeforeEnd,
     };
   }
 
   const now=new Date().toISOString().slice(0,16);
+  const titleImagesHtml=(ES.titleImages||[]).map((img,i)=>`
+    <div style="position:relative;display:inline-block;margin:4px">
+      <img src="${esc(img)}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid #e8e8e8">
+      <button onclick="removeEditTitleImage(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e53935;color:#fff;font-size:12px;border:none;cursor:pointer">×</button>
+    </div>`).join('');
+
   app.innerHTML=`
     <div class="card">
       <h2 style="font-size:18px;margin-bottom:16px">✏️ 编辑投票</h2>
       <div class="form-group"><label>投票标题 *</label><input id="e-title" type="text" placeholder="例如：2025年度评选" maxlength="80" value="${esc(ES.title)}" oninput="ES.title=this.value"></div>
+      <div class="form-group"><label>标题图片（可选，支持多张）</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">${titleImagesHtml||'<span style="color:#999;font-size:13px">暂无图片</span>'}</div>
+        <label class="upload-btn" style="display:inline-flex">📷 添加图片<input type="file" accept="image/*" multiple style="display:none" onchange="uploadEditTitleImages(this)"></label>
+      </div>
       <div class="form-group"><label>描述（可选）</label><textarea id="e-desc" rows="2" placeholder="补充说明..." oninput="ES.description=this.value">${esc(ES.description)}</textarea></div>
       <div class="form-group"><label>时间范围（可选）</label>
         <div class="form-row">
@@ -1104,6 +1195,29 @@ window.addEditOpt=function(qi){
 };
 window.removeEditOpt=function(qi,oi){syncESFromDOM();ES.questions[qi].options.splice(oi,1);renderEditQuestions();};
 
+window.uploadEditTitleImages=function(input){
+  syncESFromDOM();
+  const files=input.files;
+  if(!files.length)return;
+  Array.from(files).forEach(file=>{
+    if(file.size>5*1024*1024){toast('图片大小不能超过5MB');return;}
+    const reader=new FileReader();
+    reader.onload=function(e){
+      if(!ES.titleImages)ES.titleImages=[];
+      ES.titleImages.push(e.target.result);
+      renderEdit($('#app'));
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+};
+
+window.removeEditTitleImage=function(i){
+  syncESFromDOM();
+  if(ES.titleImages)ES.titleImages.splice(i,1);
+  renderEdit($('#app'));
+};
+
 window.uploadEditImage=function(qi,oi,input){
   const file=input.files[0];
   if(!file)return;
@@ -1131,53 +1245,101 @@ window.submitEdit=async function(){
 
   const btn=$('#edit-btn');btn.disabled=true;btn.textContent='保存中...';
 
-  const data=loadData();
-  const poll=data[pollId];
+  const poll=await getPoll(pollId);
   if(!poll){toast('投票不存在');return;}
 
-  // 保留现有的投票数据，只更新设置
   const questions=ES.questions.map((q,qi)=>{
     const validOpts=q.options.filter(o=>o.text.trim()||o.image);
     let options=validOpts.map((o,oi)=>{
-      // 尝试匹配现有选项的投票数
       const existingOpt=poll.questions[qi]?.options.find(eo=>!eo.isAllSelect&&(eo.text===o.text||eo.image===o.image));
-      return{
-        id:oi+1,text:o.text.trim(),image:o.image||'',
-        votes:existingOpt?existingOpt.votes:0,
-        isAllSelect:false
-      };
+      return{id:oi+1,text:o.text.trim(),image:o.image||'',votes:existingOpt?existingOpt.votes:0,isAllSelect:false};
     });
-
     if(q.allSelectOption&&q.multipleChoice){
-      // 保留全选选项的票数
       const existingAllSel=poll.questions[qi]?.options.find(eo=>eo.isAllSelect);
-      options.push({
-        id:options.length+1,text:'全选',image:'',votes:existingAllSel?existingAllSel.votes:0,isAllSelect:true
-      });
+      options.push({id:options.length+1,text:'全选',image:'',votes:existingAllSel?existingAllSel.votes:0,isAllSelect:true});
     }
-
-    return{
-      id:qi+1,title:q.title.trim(),options,
-      multipleChoice:q.multipleChoice,maxVotes:q.maxVotes,hasAllSelect:q.allSelectOption&&q.multipleChoice,
-    };
+    return{id:qi+1,title:q.title.trim(),options,multipleChoice:q.multipleChoice,maxVotes:q.maxVotes,hasAllSelect:q.allSelectOption&&q.multipleChoice};
   });
 
   poll.title=title;
+  poll.title_images=ES.titleImages||[];
   poll.description=description;
   poll.questions=questions;
-  poll.startAt=ES.startAt?new Date(ES.startAt).getTime():null;
-  poll.endAt=ES.endAt?new Date(ES.endAt).getTime():null;
+  poll.start_at=ES.startAt?new Date(ES.startAt).getTime():null;
+  poll.end_at=ES.endAt?new Date(ES.endAt).getTime():null;
   poll.settings.showResultsBeforeEnd=$('#e-showresult').checked;
 
-  data[pollId]=poll;
-  saveData(data);
-
+  await savePoll(poll);
   ES={};
   toast('修改已保存');
   nav('admin',pollId);
 };
 
 // ========== 数据导出 ==========
+window.exportCSV=async function(){
+  const poll=await getPoll(pollId);if(!poll)return;
+  let csv='﻿投票标题,"'+poll.title+'"\n';
+  csv+='投票码,'+poll.vote_code+'\n';
+  csv+='创建时间,'+dateStr(poll.created_at)+'\n';
+  csv+='总投票人数,'+Object.keys(poll.voters).length+'\n\n';
+  csv+='=== 汇总结果 ===\n';
+  poll.questions.forEach((q,qi)=>{
+    csv+='\n问题'+(qi+1)+',"'+q.title+'"\n';
+    csv+='选项,票数,百分比\n';
+    const qTotal=q.options.reduce((s,o)=>s+o.votes,0);
+    q.options.forEach(o=>{
+      const pct=qTotal>0?Math.round((o.votes/qTotal)*1000)/10:0;
+      csv+='"'+(o.text||'(图片)')+'",'+o.votes+','+pct+'%\n';
+    });
+  });
+  csv+='\n=== 详细投票记录（匿名） ===\n';
+  csv+='投票编号,投票时间';
+  poll.questions.forEach((q,qi)=>{csv+=',问题'+(qi+1)+':'+q.title;});
+  csv+='\n';
+  Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp).forEach(([fp,voter],idx)=>{
+    csv+='匿名'+(idx+1)+','+dateStr(voter.timestamp);
+    poll.questions.forEach(q=>{
+      const sel=(voter.selections[q.id]||[]).map(id=>{const o=q.options.find(x=>x.id===id);return o?(o.text||'(图片)'):'';}).filter(Boolean).join('; ');
+      csv+=',"'+sel+'"';
+    });
+    csv+='\n';
+  });
+  downloadFile(csv,'投票数据_'+poll.title+'.csv','text/csv;charset=utf-8');
+  toast('CSV已导出');
+};
+
+window.exportJSON=async function(){
+  const poll=await getPoll(pollId);if(!poll)return;
+  const exportData={
+    title:poll.title,description:poll.description,voteCode:poll.vote_code,
+    createdAt:dateStr(poll.created_at),startAt:poll.start_at?dateStr(poll.start_at):null,endAt:poll.end_at?dateStr(poll.end_at):null,
+    totalVoters:Object.keys(poll.voters).length,closed:poll.closed,
+    questions:poll.questions.map(q=>{
+      const qTotal=q.options.reduce((s,o)=>s+o.votes,0);
+      return{id:q.id,title:q.title,multipleChoice:q.multipleChoice,
+        options:q.options.map(o=>({id:o.id,text:o.text,hasImage:!!o.image,votes:o.votes,percentage:qTotal>0?Math.round((o.votes/qTotal)*1000)/10:0})),
+      };
+    }),
+    voters:Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp).map(([code,voter],idx)=>{
+      const record={code:'匿名'+(idx+1),timestamp:dateStr(voter.timestamp),selections:{}};
+      poll.questions.forEach(q=>{
+        record.selections[q.title]=(voter.selections[q.id]||[]).map(id=>{const o=q.options.find(x=>x.id===id);return o?(o.text||'(图片)'):'';}).filter(Boolean);
+      });
+      return record;
+    }),
+  };
+  const json=JSON.stringify(exportData,null,2);
+  downloadFile(json,'投票数据_'+poll.title+'.json','application/json');
+  toast('JSON已导出');
+};
+
+function downloadFile(content,filename,type){
+  const blob=new Blob([content],{type:type});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+}
 window.exportCSV=function(){
   const data=loadData();const poll=data[pollId];if(!poll)return;
   let csv='﻿投票标题,"'+poll.title+'"\n';
@@ -1200,7 +1362,7 @@ window.exportCSV=function(){
   csv+='投票编号,投票时间';
   poll.questions.forEach((q,qi)=>{csv+=',问题'+(qi+1)+':'+q.title;});
   csv+='\n';
-  Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp).forEach(([code,voter],idx)=>{
+  Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp).forEach(([fp,voter],idx)=>{
     csv+='匿名'+(idx+1)+','+dateStr(voter.timestamp);
     poll.questions.forEach(q=>{
       const sel=(voter.selections[q.id]||[]).map(id=>{const o=q.options.find(x=>x.id===id);return o?(o.text||'(图片)'):'';}).filter(Boolean).join('; ');
