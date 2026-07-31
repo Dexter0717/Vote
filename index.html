@@ -570,6 +570,7 @@ async function renderShare(app){
   const poll=await getPoll(pollId);
   if(!poll){nav('home');return;}
   const url=location.origin+location.pathname+'#vote/'+pollId;
+  const qrUrl='https://api.qrserver.com/v1/create-qr-code/?data='+encodeURIComponent(url)+'&size=200x200';
   app.innerHTML=`
     <div class="card"><div class="share-section">
       <div class="share-icon">🎉</div>
@@ -586,6 +587,11 @@ async function renderShare(app){
         <div class="vote-code-display">${poll.vote_code}</div>
         <button class="copy-btn" onclick="copyCode()" id="copy-code-btn" style="margin-top:8px">📋 复制投票码</button>
       </div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0">
+        <p style="color:#999;font-size:12px;margin-bottom:12px">扫码也可以直接投票</p>
+        <img src="${qrUrl}" style="width:180px;height:180px;border-radius:12px;border:2px solid #e8e8e8" alt="投票二维码">
+        <div style="margin-top:8px"><button class="copy-btn" onclick="saveQRCode('${qrUrl}')" style="background:#38ef7d">💾 保存二维码</button></div>
+      </div>
     </div></div>
     <div style="display:flex;gap:10px">
       <button class="btn btn-outline" onclick="location.hash='vote/${pollId}'" style="flex:1">👀 预览</button>
@@ -601,6 +607,17 @@ window.copyUrl=function(){
 window.copyCode=async function(){
   const poll=await getPoll(pollId);if(!poll)return;
   navigator.clipboard.writeText(poll.vote_code).then(()=>{const b=$('#copy-code-btn');b.textContent='✅ 已复制';b.classList.add('copied');setTimeout(()=>{b.textContent='📋 复制投票码';b.classList.remove('copied');},2000);}).catch(()=>{toast('复制失败');});
+};
+
+window.saveQRCode=function(qrUrl){
+  const a=document.createElement('a');
+  a.href=qrUrl;
+  a.download='投票二维码_'+pollId+'.png';
+  a.target='_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  toast('正在下载二维码...');
 };
 
 // ========== VOTE ==========
@@ -905,6 +922,10 @@ async function renderAdmin(app){
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
       <button class="btn btn-outline" onclick="location.hash='results/${pollId}'" style="flex:1">📊 结果页</button>
       <button class="btn btn-outline" onclick="location.hash=''" style="flex:1">返回首页</button>
+    </div>
+    <div style="text-align:center;margin-top:16px">
+      <p style="color:#999;font-size:12px;margin-bottom:8px">分享二维码</p>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent('https://dexter0717.github.io/Vote/#vote/'+pollId)}&size=120x120" style="width:120px;height:120px;border-radius:8px;border:1px solid #e8e8e8" alt="二维码">
     </div>
     ${!poll.closed?`
       <button class="btn btn-primary btn-sm" onclick="location.hash='edit/${pollId}'" style="margin-top:10px;width:100%">✏️ 编辑投票</button>
