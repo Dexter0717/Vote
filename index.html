@@ -237,8 +237,27 @@ function render(){
 
 // ========== HOME ==========
 async function renderHome(app){
-  app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
-  const polls=await loadPolls();
+  // 先显示缓存数据，再后台刷新
+  const cachedPolls=localStorage.getItem('vote_polls_cache');
+  if(cachedPolls){
+    try{
+      const polls=JSON.parse(cachedPolls);
+      renderHomeList(app,polls);
+    }catch(e){}
+  }else{
+    app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  }
+  // 后台刷新
+  try{
+    const polls=await loadPolls();
+    localStorage.setItem('vote_polls_cache',JSON.stringify(polls));
+    renderHomeList(app,polls);
+  }catch(e){
+    if(!cachedPolls)app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>加载失败，请刷新重试</p></div>';
+  }
+}
+
+function renderHomeList(app,polls){
   const isCreatorMode=localStorage.getItem('creator_mode')==='true';
 
   app.innerHTML=`
