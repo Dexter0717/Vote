@@ -826,7 +826,7 @@ async function renderResults(app){
       ${!poll.closed?`<button class="btn btn-primary" onclick="location.hash='vote/${poll.id}'" style="flex:1">🗳️ 去投票</button>`:''}
       <button class="btn btn-outline" onclick="location.hash=''" style="flex:1">返回首页</button>
     </div>
-    ${isCreator?`<button class="btn btn-danger btn-sm" onclick="closePoll('${poll.id}')" style="margin-top:10px;width:100%" ${poll.closed?'disabled':''}>${poll.closed?'已结束':'🔒 结束投票'}</button>`:''}
+    ${showEditBtn?`<button class="btn btn-danger btn-sm" onclick="closePoll('${poll.id}')" style="margin-top:10px;width:100%" ${poll.closed?'disabled':''}>${poll.closed?'已结束':'🔒 结束投票'}</button>`:''}
     ${showEditBtn?`<button class="btn btn-primary btn-sm" onclick="location.hash='admin/${poll.id}'" style="margin-top:10px;width:100%">👥 查看投票详情</button>`:''}`;
   const el=$('#result-items');
   el.innerHTML=poll.questions.map((q,qi)=>{
