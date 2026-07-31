@@ -183,15 +183,31 @@ function dateStr(ts){if(!ts)return'';const d=new Date(ts);return d.toLocaleDateS
 // ========== Supabase 初始化 ==========
 const supabaseUrl = 'https://dfkfhkmoshaxlyyoiqgp.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRma2Zoa21vc2hheGx5eW9pcWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MDQwMzIsImV4cCI6MjEwMDk4MDAzMn0.qV7gPKMFki1ayh6R9S2vAdyUQqiIoQGkXa2008mX5Sw';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+let supabase;
+try{
+  supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+  console.log('Supabase初始化成功');
+}catch(e){
+  console.error('Supabase初始化失败:',e);
+  // 备用方案：尝试不同的初始化方式
+  if(window.supabase&&window.supabase.createClient){
+    supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+  }
+}
 
 // 数据库操作 + 本地缓存
 let pollCache={}; // 本地缓存，避免每次点击都调API
 
 async function loadPolls(){
-  const {data,error}=await supabase.from('polls').select('*').order('created_at',{ascending:false});
-  if(error){console.error('加载失败:',error);return[];}
-  return data||[];
+  if(!supabase){console.error('Supabase未初始化');return[];}
+  try{
+    const {data,error}=await supabase.from('polls').select('*').order('created_at',{ascending:false});
+    if(error){console.error('加载失败:',error);return[];}
+    return data||[];
+  }catch(e){
+    console.error('加载异常:',e);
+    return[];
+  }
 }
 async function getPoll(id){
   // 优先用缓存，减少API调用
