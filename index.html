@@ -570,7 +570,6 @@ async function renderShare(app){
   const poll=await getPoll(pollId);
   if(!poll){nav('home');return;}
   const url=location.origin+location.pathname+'#vote/'+pollId;
-  const qrUrl='https://api.qrserver.com/v1/create-qr-code/?data='+encodeURIComponent(url)+'&size=200x200';
   app.innerHTML=`
     <div class="card"><div class="share-section">
       <div class="share-icon">🎉</div>
@@ -588,9 +587,12 @@ async function renderShare(app){
         <button class="copy-btn" onclick="copyCode()" id="copy-code-btn" style="margin-top:8px">📋 复制投票码</button>
       </div>
       <div style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0">
-        <p style="color:#999;font-size:12px;margin-bottom:12px">扫码也可以直接投票</p>
-        <img src="${qrUrl}" style="width:180px;height:180px;border-radius:12px;border:2px solid #e8e8e8" alt="投票二维码">
-        <div style="margin-top:8px"><button class="copy-btn" onclick="saveQRCode('${qrUrl}')" style="background:#38ef7d">💾 保存二维码</button></div>
+        <button class="copy-btn" onclick="showQRCode()" id="qr-btn" style="background:#764ba2">📱 生成二维码</button>
+        <div id="qr-container" style="margin-top:12px;display:none">
+          <p style="color:#999;font-size:12px;margin-bottom:8px">扫码也可以直接投票</p>
+          <img id="qr-img" style="width:180px;height:180px;border-radius:12px;border:2px solid #e8e8e8" alt="投票二维码">
+          <div style="margin-top:8px"><button class="copy-btn" onclick="saveQRCode()" style="background:#38ef7d">💾 保存二维码</button></div>
+        </div>
       </div>
     </div></div>
     <div style="display:flex;gap:10px">
@@ -609,9 +611,27 @@ window.copyCode=async function(){
   navigator.clipboard.writeText(poll.vote_code).then(()=>{const b=$('#copy-code-btn');b.textContent='✅ 已复制';b.classList.add('copied');setTimeout(()=>{b.textContent='📋 复制投票码';b.classList.remove('copied');},2000);}).catch(()=>{toast('复制失败');});
 };
 
-window.saveQRCode=function(qrUrl){
+window.showQRCode=function(){
+  const url=location.origin+location.pathname+'#vote/'+pollId;
+  const qrUrl='https://api.qrserver.com/v1/create-qr-code/?data='+encodeURIComponent(url)+'&size=200x200';
+  const container=$('#qr-container');
+  const img=$('#qr-img');
+  const btn=$('#qr-btn');
+  if(container.style.display==='none'){
+    img.src=qrUrl;
+    container.style.display='block';
+    btn.textContent='📱 隐藏二维码';
+  }else{
+    container.style.display='none';
+    btn.textContent='📱 生成二维码';
+  }
+};
+
+window.saveQRCode=function(){
+  const img=$('#qr-img');
+  if(!img||!img.src)return;
   const a=document.createElement('a');
-  a.href=qrUrl;
+  a.href=img.src;
   a.download='投票二维码_'+pollId+'.png';
   a.target='_blank';
   document.body.appendChild(a);
