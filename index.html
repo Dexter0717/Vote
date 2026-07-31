@@ -630,7 +630,9 @@ async function renderVote(app){
     <button class="btn btn-outline" onclick="location.hash=''">返回首页</button>`;
     return;
   }
-  if(currentVoteCode&&poll.voters[currentVoteCode]){
+  // 用浏览器指纹检查是否已投票
+  let fp=localStorage.getItem('vote_fp');
+  if(fp&&poll.voters[fp]){
     if(localStorage.getItem('ct_'+pollId)){renderVoteForm(app,poll,true);return;}
     nav('results');return;
   }
@@ -766,9 +768,13 @@ window.submitVote=async function(){
   const code=codeInput?codeInput.value.trim().toUpperCase():'';
   if(!code||code.length!==6){toast('请输入6位投票码');if(codeInput)codeInput.focus();return;}
   currentVoteCode=code;
-  delete pollCache[pollId]; // 强制刷新
+  delete pollCache[pollId];
   const poll=await getPoll(pollId);if(!poll)return;
-  if(poll.voters[code]){toast('该投票码已使用过');return;}
+  if(poll.vote_code!==code){toast('投票码错误');return;}
+  // 用浏览器指纹防止同一设备重复投票
+  let fp=localStorage.getItem('vote_fp');
+  if(!fp){fp='fp_'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('vote_fp',fp);}
+  if(poll.voters[fp]){toast('你已经投过票了');return;}
   const allAnswered=poll.questions.every(q=>selections[q.id]&&selections[q.id].size>0);
   if(!allAnswered){toast('请完成所有问题');return;}
   const btn=$('#vote-btn');btn.disabled=true;btn.textContent='提交中...';
@@ -781,7 +787,7 @@ window.submitVote=async function(){
     if(q.maxVotes>0&&valid.length>q.maxVotes){toast(`"${q.title}"最多只能选${q.maxVotes}项`);btn.disabled=false;btn.textContent='🗳️ 提交投票';return;}
     finalSelections[q.id]=valid;
   }
-  poll.voters[code]={selections:finalSelections,timestamp:Date.now()};
+  poll.voters[fp]={selections:finalSelections,timestamp:Date.now(),code:code};
   for(const q of poll.questions){for(const optId of (finalSelections[q.id]||[])){const opt=q.options.find(o=>o.id===optId);if(opt)opt.votes++;}}
   const ok=await savePoll(poll);
   if(!ok){toast('投票失败，请重试');btn.disabled=false;btn.textContent='🗳️ 提交投票';return;}
@@ -798,7 +804,8 @@ async function renderResults(app){
   const totalVotes=Object.keys(poll.voters).length;
   const isCreator=!!localStorage.getItem('ct_'+pollId);
   let mySel={};
-  if(currentVoteCode&&poll.voters[currentVoteCode]){mySel=poll.voters[currentVoteCode].selections||{};}
+  let fp=localStorage.getItem('vote_fp');
+  if(fp&&poll.voters[fp]){mySel=poll.voters[fp].selections||{};}
   const titleImages=poll.title_images||[];
   app.innerHTML=`
     <div class="card">
@@ -919,6 +926,7 @@ async function renderAdmin(app){
   else{
     voterEl.innerHTML=voterEntries.map(([code,voter],idx)=>{
       const time=dateStr(voter.timestamp);
+      const voterCode=voter.code||'未知';
       const sels=Object.entries(voter.selections).map(([qid,selectedIds])=>{
         const q=poll.questions.find(x=>x.id===+qid);if(!q)return'';
         const texts=q.options.filter(o=>selectedIds.includes(o.id)&&!o.isAllSelect).map(o=>o.text||'(图片选项)');
@@ -1224,7 +1232,7 @@ window.exportCSV=async function(){
   csv+='投票编号,投票时间';
   poll.questions.forEach((q,qi)=>{csv+=',问题'+(qi+1)+':'+q.title;});
   csv+='\n';
-  Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp).forEach(([code,voter],idx)=>{
+  Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp).forEach(([fp,voter],idx)=>{
     csv+='匿名'+(idx+1)+','+dateStr(voter.timestamp);
     poll.questions.forEach(q=>{
       const sel=(voter.selections[q.id]||[]).map(id=>{const o=q.options.find(x=>x.id===id);return o?(o.text||'(图片)'):'';}).filter(Boolean).join('; ');
@@ -1290,7 +1298,7 @@ window.exportCSV=function(){
   csv+='投票编号,投票时间';
   poll.questions.forEach((q,qi)=>{csv+=',问题'+(qi+1)+':'+q.title;});
   csv+='\n';
-  Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp).forEach(([code,voter],idx)=>{
+  Object.entries(poll.voters).sort((a,b)=>a[1].timestamp-b[1].timestamp).forEach(([fp,voter],idx)=>{
     csv+='匿名'+(idx+1)+','+dateStr(voter.timestamp);
     poll.questions.forEach(q=>{
       const sel=(voter.selections[q.id]||[]).map(id=>{const o=q.options.find(x=>x.id===id);return o?(o.text||'(图片)'):'';}).filter(Boolean).join('; ');
