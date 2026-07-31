@@ -237,10 +237,25 @@ function render(){
 
 // ========== HOME ==========
 async function renderHome(app){
-  app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
-  const polls=await loadPolls();
   const isCreatorMode=localStorage.getItem('creator_mode')==='true';
+  // 先用缓存渲染
+  const cachedPolls=localStorage.getItem('vote_polls_cache');
+  if(cachedPolls){
+    try{renderHomeList(app,JSON.parse(cachedPolls),isCreatorMode);}catch(e){}
+  }else{
+    app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  }
+  // 后台静默刷新
+  try{
+    const polls=await loadPolls();
+    localStorage.setItem('vote_polls_cache',JSON.stringify(polls));
+    renderHomeList(app,polls,isCreatorMode);
+  }catch(e){
+    console.error('刷新失败:',e);
+  }
+}
 
+function renderHomeList(app,polls,isCreatorMode){
   app.innerHTML=`
     <div class="hero">
       <div class="hero-icon">🗳️</div>
@@ -606,11 +621,15 @@ window.copyCode=async function(){
 // ========== VOTE ==========
 let selections={};
 async function renderVote(app){
-  app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
-  // 清除缓存强制刷新
-  delete pollCache[pollId];
-  const poll=await getPoll(pollId);
-  if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
+  // 先用缓存
+  const cachedPoll=await getPoll(pollId);
+  if(cachedPoll){renderVoteForm(app,cachedPoll,false);}
+  else{app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';}
+  // 后台刷新
+  try{
+    delete pollCache[pollId];
+    const poll=await getPoll(pollId);
+  if(!poll){return;}
   const now=Date.now();
   if(poll.closed||(poll.end_at&&now>poll.end_at)){
     if(localStorage.getItem('ct_'+pollId)){
@@ -639,6 +658,7 @@ async function renderVote(app){
     nav('results');return;
   }
   renderVoteForm(app,poll,false);
+  }catch(e){console.error('刷新失败:',e);}
 }
 function renderVoteForm(app,poll,hasVoted=false){
   selections={};poll.questions.forEach(q=>selections[q.id]=new Set());
