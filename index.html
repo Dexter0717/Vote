@@ -185,25 +185,33 @@ const supabaseUrl = 'https://dfkfhkmoshaxlyyoiqgp.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRma2Zoa21vc2hheGx5eW9pcWdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MDQwMzIsImV4cCI6MjEwMDk4MDAzMn0.qV7gPKMFki1ayh6R9S2vAdyUQqiIoQGkXa2008mX5Sw';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-// 数据库操作
+// 数据库操作 + 本地缓存
+let pollCache={}; // 本地缓存，避免每次点击都调API
+
 async function loadPolls(){
   const {data,error}=await supabase.from('polls').select('*').order('created_at',{ascending:false});
   if(error){console.error('加载失败:',error);return[];}
   return data||[];
 }
 async function getPoll(id){
+  // 优先用缓存，减少API调用
+  if(pollCache[id])return pollCache[id];
   const {data,error}=await supabase.from('polls').select('*').eq('id',id).single();
   if(error){console.error('获取投票失败:',error);return null;}
+  pollCache[id]=data;
   return data;
 }
+function getCachedPoll(id){return pollCache[id]||null;} // 同步获取缓存
 async function savePoll(poll){
   const {error}=await supabase.from('polls').upsert(poll,{onConflict:'id'});
   if(error){console.error('保存失败:',error);return false;}
+  pollCache[poll.id]=poll; // 更新缓存
   return true;
 }
 async function deletePoll(id){
   const {error}=await supabase.from('polls').delete().eq('id',id);
   if(error){console.error('删除失败:',error);return false;}
+  delete pollCache[id];
   return true;
 }
 
@@ -599,6 +607,8 @@ window.copyCode=async function(){
 let selections={};
 async function renderVote(app){
   app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  // 清除缓存强制刷新
+  delete pollCache[pollId];
   const poll=await getPoll(pollId);
   if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
   const now=Date.now();
@@ -689,8 +699,8 @@ function renderVoteQuestions(poll){
     </div>`;
   }).join('');
 }
-window.toggleOpt=async function(qid,oid){
-  const poll=await getPoll(pollId);if(!poll)return;
+window.toggleOpt=function(qid,oid){
+  const poll=getCachedPoll(pollId);if(!poll)return;
   const q=poll.questions.find(x=>x.id===qid);if(!q)return;
   const clickedOpt=q.options.find(o=>o.id===oid);
 
@@ -733,8 +743,8 @@ window.toggleOpt=async function(qid,oid){
   renderVoteQuestions(poll);
   updateVoteBtn();
 };
-async function updateVoteBtn(){
-  const poll=await getPoll(pollId);if(!poll)return;
+function updateVoteBtn(){
+  const poll=getCachedPoll(pollId);if(!poll)return;
   // 直接从输入框获取值
   const codeInput=$('#vote-code-input');
   const code=codeInput?codeInput.value.trim():currentVoteCode.trim();
@@ -756,6 +766,7 @@ window.submitVote=async function(){
   const code=codeInput?codeInput.value.trim().toUpperCase():'';
   if(!code||code.length!==6){toast('请输入6位投票码');if(codeInput)codeInput.focus();return;}
   currentVoteCode=code;
+  delete pollCache[pollId]; // 强制刷新
   const poll=await getPoll(pollId);if(!poll)return;
   if(poll.voters[code]){toast('该投票码已使用过');return;}
   const allAnswered=poll.questions.every(q=>selections[q.id]&&selections[q.id].size>0);
@@ -774,12 +785,14 @@ window.submitVote=async function(){
   for(const q of poll.questions){for(const optId of (finalSelections[q.id]||[])){const opt=q.options.find(o=>o.id===optId);if(opt)opt.votes++;}}
   const ok=await savePoll(poll);
   if(!ok){toast('投票失败，请重试');btn.disabled=false;btn.textContent='🗳️ 提交投票';return;}
+  localStorage.setItem('vote_current_code',code);
   toast('投票成功！');nav('results');
 };
 
 // ========== RESULTS ==========
 async function renderResults(app){
   app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  delete pollCache[pollId];
   const poll=await getPoll(pollId);
   if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
   const totalVotes=Object.keys(poll.voters).length;
@@ -855,6 +868,7 @@ async function renderAdmin(app){
   app.innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
   const token=localStorage.getItem('ct_'+pollId);
   if(!token){app.innerHTML='<div class="card"><div class="empty-state"><div class="icon">🔒</div><p>无权访问后台</p></div></div><button class="btn btn-outline" onclick="location.hash=\'\'" style="margin-top:10px">返回首页</button>';return;}
+  delete pollCache[pollId];
   const poll=await getPoll(pollId);
   if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
   const totalVotes=Object.keys(poll.voters).length;
@@ -928,6 +942,7 @@ async function renderEdit(app){
   const token=localStorage.getItem('ct_'+pollId);
   if(!token){app.innerHTML='<div class="card"><div class="empty-state"><div class="icon">🔒</div><p>无权编辑此投票</p></div></div>';return;}
 
+  delete pollCache[pollId];
   const poll=await getPoll(pollId);
   if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
 
@@ -935,6 +950,7 @@ async function renderEdit(app){
     ES={
       id:pollId,
       title:poll.title,
+      titleImages:poll.title_images||[],
       description:poll.description||'',
       questions:poll.questions.map(q=>({
         id:q.id,
@@ -951,10 +967,20 @@ async function renderEdit(app){
   }
 
   const now=new Date().toISOString().slice(0,16);
+  const titleImagesHtml=(ES.titleImages||[]).map((img,i)=>`
+    <div style="position:relative;display:inline-block;margin:4px">
+      <img src="${esc(img)}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid #e8e8e8">
+      <button onclick="removeEditTitleImage(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e53935;color:#fff;font-size:12px;border:none;cursor:pointer">×</button>
+    </div>`).join('');
+
   app.innerHTML=`
     <div class="card">
       <h2 style="font-size:18px;margin-bottom:16px">✏️ 编辑投票</h2>
       <div class="form-group"><label>投票标题 *</label><input id="e-title" type="text" placeholder="例如：2025年度评选" maxlength="80" value="${esc(ES.title)}" oninput="ES.title=this.value"></div>
+      <div class="form-group"><label>标题图片（可选，支持多张）</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">${titleImagesHtml||'<span style="color:#999;font-size:13px">暂无图片</span>'}</div>
+        <label class="upload-btn" style="display:inline-flex">📷 添加图片<input type="file" accept="image/*" multiple style="display:none" onchange="uploadEditTitleImages(this)"></label>
+      </div>
       <div class="form-group"><label>描述（可选）</label><textarea id="e-desc" rows="2" placeholder="补充说明..." oninput="ES.description=this.value">${esc(ES.description)}</textarea></div>
       <div class="form-group"><label>时间范围（可选）</label>
         <div class="form-row">
@@ -1097,6 +1123,29 @@ window.addEditOpt=function(qi){
 };
 window.removeEditOpt=function(qi,oi){syncESFromDOM();ES.questions[qi].options.splice(oi,1);renderEditQuestions();};
 
+window.uploadEditTitleImages=function(input){
+  syncESFromDOM();
+  const files=input.files;
+  if(!files.length)return;
+  Array.from(files).forEach(file=>{
+    if(file.size>5*1024*1024){toast('图片大小不能超过5MB');return;}
+    const reader=new FileReader();
+    reader.onload=function(e){
+      if(!ES.titleImages)ES.titleImages=[];
+      ES.titleImages.push(e.target.result);
+      renderEdit($('#app'));
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+};
+
+window.removeEditTitleImage=function(i){
+  syncESFromDOM();
+  if(ES.titleImages)ES.titleImages.splice(i,1);
+  renderEdit($('#app'));
+};
+
 window.uploadEditImage=function(qi,oi,input){
   const file=input.files[0];
   if(!file)return;
@@ -1141,6 +1190,7 @@ window.submitEdit=async function(){
   });
 
   poll.title=title;
+  poll.title_images=ES.titleImages||[];
   poll.description=description;
   poll.questions=questions;
   poll.start_at=ES.startAt?new Date(ES.startAt).getTime():null;
