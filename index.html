@@ -163,7 +163,7 @@
 </head>
 <body>
   <div class="header">
-    <h1>🗳️ 投票（云数据版）v1.2</h1>
+    <h1>🗳️ 投票（云数据版）v1.3</h1>
   </div>
   <div class="container" id="app"></div>
 
@@ -624,8 +624,10 @@ async function renderVote(app){
   }
   if(poll.start_at&&now<poll.start_at){
     const isCreator=isPollCreator(pollId);
+    const isCreatorMode=localStorage.getItem('creator_mode')==='true';
+    const showEditBtn=isCreator&&isCreatorMode;
     app.innerHTML=`<div class="card"><div class="empty-state"><div class="icon">⏰</div><p>投票尚未开始</p><p style="font-size:13px;color:#999">开始时间：${dateStr(poll.start_at)}</p></div></div>
-    ${isCreator?`<button class="btn btn-primary" onclick="location.hash='admin/${pollId}'" style="margin-bottom:10px">🔑 进入后台管理</button>
+    ${showEditBtn?`<button class="btn btn-primary" onclick="location.hash='admin/${pollId}'" style="margin-bottom:10px">🔑 进入后台管理</button>
     <button class="btn btn-outline" onclick="location.hash='edit/${pollId}'" style="margin-bottom:10px">✏️ 编辑投票</button>`:''}
     <button class="btn btn-outline" onclick="location.hash=''">返回首页</button>`;
     return;
@@ -803,6 +805,8 @@ async function renderResults(app){
   if(!poll){app.innerHTML='<div class="empty-state"><div class="icon">😕</div><p>投票不存在</p></div>';return;}
   const totalVotes=Object.keys(poll.voters).length;
   const isCreator=!!localStorage.getItem('ct_'+pollId);
+  const isCreatorMode=localStorage.getItem('creator_mode')==='true';
+  const showEditBtn=isCreator&&isCreatorMode;
   let mySel={};
   let fp=localStorage.getItem('vote_fp');
   if(fp&&poll.voters[fp]){mySel=poll.voters[fp].selections||{};}
@@ -823,7 +827,7 @@ async function renderResults(app){
       <button class="btn btn-outline" onclick="location.hash=''" style="flex:1">返回首页</button>
     </div>
     ${isCreator?`<button class="btn btn-danger btn-sm" onclick="closePoll('${poll.id}')" style="margin-top:10px;width:100%" ${poll.closed?'disabled':''}>${poll.closed?'已结束':'🔒 结束投票'}</button>`:''}
-    ${isCreator?`<button class="btn btn-primary btn-sm" onclick="location.hash='admin/${poll.id}'" style="margin-top:10px;width:100%">👥 查看投票详情</button>`:''}`;
+    ${showEditBtn?`<button class="btn btn-primary btn-sm" onclick="location.hash='admin/${poll.id}'" style="margin-top:10px;width:100%">👥 查看投票详情</button>`:''}`;
   const el=$('#result-items');
   el.innerHTML=poll.questions.map((q,qi)=>{
     const qTotal=q.options.reduce((s,o)=>s+o.votes,0);
